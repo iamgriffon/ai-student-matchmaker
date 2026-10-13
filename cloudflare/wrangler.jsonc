@@ -5,7 +5,7 @@
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": "../public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/training"] },
-  "d1_databases": [{ "binding": "DB", "database_name": "vestibulandos", "migrations_dir": "migrations" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "vestibulandos", "database_id": "4d271143-3bbd-4b7d-9107-2a531003f413", "migrations_dir": "migrations" }],
   "vectorize": [
     { "binding": "STUDENT_INDEX", "index_name": "vestibulandos-students", "remote": true },
     { "binding": "PAIR_INDEX", "index_name": "vestibulandos-pairs", "remote": true }

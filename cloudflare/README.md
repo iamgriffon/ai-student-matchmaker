@@ -6,7 +6,7 @@ This directory is the Cloudflare implementation on the `cloudflare` branch. On t
 
 - **Workers**: API and the existing frontend, served through the static-assets binding.
 - **Prisma ORM 7 + `@prisma/adapter-d1`**: relational data in D1. The experimental Prisma 8 PostgreSQL contract is not a D1 adapter; this target has its own SQLite schema and generated client.
-- **Vectorize**: three-dimensional student vectors and four-dimensional pair vectors, in separate Euclidean indexes. D1 stores vector IDs and cohort context, not JSON arrays of vectors.
+- **Vectorize**: student vectors with three features and pair vectors with four features, stored in separate 32-dimensional Euclidean indexes. Extra coordinates are zero padding, preserving distances and the ranker’s four inputs. D1 stores vector IDs and cohort context, not JSON arrays of vectors.
 - **D1 JSON**: model artifacts and reports, validated with the existing Zod schemas. SQLite stores JSON rather than PostgreSQL `jsonb`.
 - **Workflows**: asynchronous TensorFlow.js training with a CPU backend, durable progress and one active operation enforced by a D1 unique constraint. The default remains one ranker, learning rate `0.001`, 80 iterations, with optional comparison.
 - **Shared engine**: normalization, eligibility, validation schemas and model training preserve the original semantics. The Postgres cache adapter remains separate.
@@ -29,11 +29,11 @@ Provision the resources in your Cloudflare account:
 
 ```bash
 bunx wrangler d1 create vestibulandos
-bunx wrangler vectorize create vestibulandos-students --dimensions=3 --metric=euclidean
-bunx wrangler vectorize create vestibulandos-pairs --dimensions=4 --metric=euclidean
+bunx wrangler vectorize create vestibulandos-students --dimensions=32 --metric=euclidean
+bunx wrangler vectorize create vestibulandos-pairs --dimensions=32 --metric=euclidean
 ```
 
-Set the returned `database_id` on the D1 binding in `wrangler.jsonc`. The Vectorize indexes must exist with the exact configured names and dimensions. Workflows are bound through the same config. This target requests a five-minute CPU budget for training and requires an appropriate Workers paid plan.
+The D1 binding in `wrangler.jsonc` already contains the supplied `vestibulandos` database ID. Keep its binding name `DB`, which the Worker expects. The Vectorize indexes must exist with the exact configured names and dimensions. Workflows are bound through the same config. This target requests a five-minute CPU budget for training and requires an appropriate Workers paid plan.
 
 ```bash
 bun run db:migrate:local

@@ -4,6 +4,7 @@ import { parseIncome } from "../../src/utils/incomeParser.ts";
 import { PAIR_ENCODER_VERSION } from "../../src/vectorSchema.ts";
 import { readPairFeatures } from "../../src/pairPolicy.ts";
 import { database, HttpError, APP_STATE_ID, VECTOR_BATCH_SIZE, type Database } from "./database.ts";
+import { encodeVectorizeValues } from "./vectorizeEncoding.ts";
 import type { User } from "./generated/prisma/client.ts";
 
 const MAX_EXAM_SCORE = 100;
@@ -60,7 +61,7 @@ export async function synchronizeStudentVectors(env: Env, context: Cohort) {
     const students = await Promise.all(context.students.slice(offset, offset + VECTOR_BATCH_SIZE).map(async (student) => ({ ...student, vectorId: await vectorId(`${context.revision}:${context.contextVersion}:${student.userId}`) })));
     await env.STUDENT_INDEX.upsert(students.map((student) => ({
       id: student.vectorId, metadata: { userId: student.userId }, namespace: context.contextVersion,
-      values: [student.features.score, student.features.income, student.features.disability],
+      values: encodeVectorizeValues([student.features.score, student.features.income, student.features.disability]),
     })));
     await env.DB.batch(students.map((student) => env.DB.prepare(`
       INSERT INTO StudentVectors (id, userId, contextVersion) SELECT ?, ?, ? FROM AppState WHERE id = ? AND revision = ?
@@ -98,7 +99,7 @@ export async function savePairFeatures(env: Env, context: Cohort, pairs: readonl
     await env.PAIR_INDEX.upsert(stored.map((row) => {
       const values = byMembers.get(`${row.userAId}:${row.userBId}`);
       if (typeof values == 'undefined') throw new Error("Pair features missing.");
-      return { id: row.vectorId, values: Array.from(values), namespace: pairNamespace(context) };
+      return { id: row.vectorId, values: encodeVectorizeValues(values), namespace: pairNamespace(context) };
     }));
   }
 }

@@ -9,6 +9,7 @@ import { PAIR_RANKER_INPUT_COUNT } from "../../src/modelConfig.ts";
 import { database, APP_STATE_ID, ACTIVE_MODEL_KIND, VECTOR_BATCH_SIZE, HttpError } from "./database.ts";
 import { cohort, pairFeatures, savePairFeatures, synchronizeStudentVectors, type Cohort } from "./vectors.ts";
 import { isCompatible, modelPayload } from "./models.ts";
+import { decodePairVectorizeValues } from "./vectorizeEncoding.ts";
 
 const ANCHORS_PER_GROUP = 2;
 const MIN_PARTITION_PAIRS = 200;
@@ -52,7 +53,7 @@ async function samplesForTraining(env: Env, context: Cohort) {
     const byId = new Map(vectors.map((vector) => [vector.id, vector.values]));
     for (const row of batch) {
       const values = byId.get(row.vectorId);
-      if (typeof values != 'undefined') persisted.set(`${row.userAId}:${row.userBId}`, Array.from(values));
+      if (typeof values != 'undefined') persisted.set(`${row.userAId}:${row.userBId}`, decodePairVectorizeValues(values));
     }
   }
   const toSample = (pair: typeof pairs[number]) => {

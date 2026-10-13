@@ -2,6 +2,7 @@ import { evaluatePair } from "../../src/pairPolicy.ts";
 import { database, HttpError } from "./database.ts";
 import { cohort, pairFeatures, parseUserId, savePairFeatures, synchronizeStudentVectors } from "./vectors.ts";
 import { activeModel, scoreWithModel } from "./models.ts";
+import { encodeVectorizeValues } from "./vectorizeEncoding.ts";
 
 const RECOMMENDATION_LIMIT = 5;
 const VECTOR_CANDIDATE_LIMIT = 50;
@@ -19,10 +20,10 @@ export async function recommendPartners(env: Env, userId: string) {
   ]);
   if (indexed !== context.students.length) await synchronizeStudentVectors(env, context);
   // Complementary score targets the cohort mean; opposite social features encourage diversity.
-  const vectorMatches = await env.STUDENT_INDEX.query([
+  const vectorMatches = await env.STUDENT_INDEX.query(encodeVectorizeValues([
     Math.max(0, Math.min(1, context.cohortMeanScore * 2 - selected.features.score)),
     1 - selected.features.income, 1 - selected.features.disability,
-  ], { namespace: context.contextVersion, topK: VECTOR_CANDIDATE_LIMIT, returnMetadata: "all" });
+  ]), { namespace: context.contextVersion, topK: VECTOR_CANDIDATE_LIMIT, returnMetadata: "all" });
   const priority = new Map(vectorMatches.matches.flatMap((match, index) => typeof match.metadata?.userId === "string" ? [[match.metadata.userId, index] as const] : []));
   const users = new Map(context.users.map((user) => [user.id, user]));
   const started = new Map(outcomes.map((outcome) => [outcome.userAId === id ? outcome.userBId : outcome.userAId, outcome.id]));
