@@ -11,7 +11,7 @@ export default defineConfig({
   outExtensions: () => ({ js: ".mjs" }),
   copy: [{ from: ["public/**/*", "!public/tests/**"], to: "dist/public", flatten: false }],
   outputOptions: {
-    codeSplitting: false,
+    codeSplitting: true,
   },
   deps: {
     onlyBundle: false,

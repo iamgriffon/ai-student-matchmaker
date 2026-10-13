@@ -1,6 +1,6 @@
 # Cloudflare target
 
-This directory is the Cloudflare implementation on the `cloudflare` branch. The `main` branch preserves the Bun/PostgreSQL application, including English-first i18n.
+This directory is the Cloudflare implementation on the `cloudflare` branch. On this branch, root `bun run build`, `bun run deploy` and `bun dev` target Cloudflare; the launcher installs the nested dependencies with its frozen lockfile before invoking Wrangler. The `main` branch preserves the Bun/PostgreSQL application, including English-first i18n.
 
 ## Architecture
 
@@ -72,3 +72,14 @@ No Postgres reset or data migration is implicit. The seed is idempotent and inse
 Prisma client generation, SQL migration generation and Wrangler binding type generation can be performed without building or deploying. A Worker build, runtime integration tests, typecheck and deployment must still be performed with explicit user authorization and configured Cloudflare resources. No remote resources are created by editing this target.
 
 References: [Prisma D1 integration](https://www.prisma.io/docs/guides/v7/deployment/cloudflare-d1), [D1 batch transactions](https://developers.cloudflare.com/d1/worker-api/d1-database/), [Vectorize client API](https://developers.cloudflare.com/vectorize/reference/client-api/), [Workflow CPU limits](https://developers.cloudflare.com/workflows/reference/limits/).
+
+## Cloudflare Workers Builds (Git integration)
+
+Select branch **cloudflare** and keep the repository root as the root directory. Configure:
+
+- Build command: `bun run build`
+- Deploy command: `bun run deploy`
+
+The root build installs `cloudflare/` dependencies, generates the Prisma D1 client and validates the Worker bundle with a dry run. The deploy command uses `cloudflare/wrangler.jsonc`. If the dashboard currently uses `npx wrangler deploy`, replace it with `bun run deploy` so Wrangler runs from the Cloudflare package.
+
+The old Node commands are explicit aliases: `bun run build:node`, `bun run dev:node` and `bun run deploy:node`. The `main` branch is not modified by this fix.

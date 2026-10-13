@@ -30,11 +30,11 @@ Execute os comandos na pasta `projeto-vestibulandos`:
 
 ```bash
 bun install --frozen-lockfile
-bun run build
+bun run build:node
 bun start
 ```
 
-No serviço de deploy, configure `bun run build` como comando de build e `bun start` como comando de inicialização. O ambiente precisa ter Bun instalado e `DATABASE_URL` apontando para um PostgreSQL com pgvector e as migrações do projeto aplicadas. `PORT` é opcional e usa `3000` por padrão.
+No serviço de deploy, para o alvo Node, configure `bun run build:node` como comando de build e `bun start` como comando de inicialização. O ambiente precisa ter Bun instalado e `DATABASE_URL` apontando para um PostgreSQL com pgvector e as migrações do projeto aplicadas. `PORT` é opcional e usa `3000` por padrão.
 
 O build inclui `dist/server.mjs`, `dist/trainMatchmaking.mjs` e `dist/public/`. O servidor usa os arquivos compilados, com `NODE_ENV=production` e sem watch. O treinamento iniciado pelo frontend também executa o worker compilado.
 
@@ -68,4 +68,4 @@ The frontend defaults to English (`en-US`). The main menu offers Portuguese (`pt
 
 ## Cloudflare branch
 
-On branch `cloudflare`, the Workers/D1/Vectorize target lives in [cloudflare/](cloudflare/README.md). Use `bun run dev:cloudflare` for this target; the original `bun dev` and PostgreSQL database remain independent. Configure the resources and apply the D1 migrations before starting it.
+On branch `cloudflare`, the Workers/D1/Vectorize target lives in [cloudflare/](cloudflare/README.md). On this branch, `bun dev`, `bun run build` and `bun run deploy` target Cloudflare and install its nested dependencies automatically. The PostgreSQL target remains available with `bun run dev:node` and `bun run build:node`. Configure the resources and apply the D1 migrations before starting it.
