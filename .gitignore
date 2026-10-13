@@ -38,3 +38,9 @@ dist/
 .env
 /.alchemy
 /.prisma-composer
+
+# Cloudflare local state and secrets
+**/.wrangler/
+**/.dev.vars
+**/.dev.vars.*
+**/local.db*

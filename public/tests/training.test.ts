@@ -44,7 +44,7 @@ describe("training history frontend", () => {
     expect(app.state.selectedId).toBe(FIRST_ID);
     expect(elements.get("training-list")?.innerHTML).toContain(ITERATION.modelId);
     expect(elements.get("training-detail")?.innerHTML).toContain("Active model");
-    expect(elements.get("training-notice")?.textContent).toContain("banco de dados");
+    expect(elements.get("training-notice")?.textContent).toContain("Training history loaded");
   });
   test("shows architecture, validation, report comparisons and the epoch chart", () => {
     const detail = elements.get("training-detail")?.innerHTML;

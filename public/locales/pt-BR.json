@@ -141,7 +141,7 @@
   "Study pair started.": "Dupla iniciada.",
   "Study pair already started.": "Dupla já iniciada.",
   "Outcomes saved.": "Resultados salvos.",
-  "Wait for the current training operation to finish.": "Aguarde a operação atual de treinamento terminar.",
+  "Wait for the current training operation to finish.": "Aguarde o treinamento atual terminar.",
   "Preparing pair vectors…": "Preparando os vetores de dupla…",
   "Saving models and training reports…": "Salvando modelos e relatórios…",
   "Model trained and activated.": "Modelo treinado e ativado.",
@@ -203,5 +203,18 @@
   "The model is incompatible with the current encoder or policy": "Modelo incompatível com o encoder ou a política atual",
   "The model did not meet the validation error threshold": "O modelo não atingiu o limite de erro de validação",
   "Model not found": "Modelo não encontrado",
-  "Model not found.": "Modelo não encontrado."
+  "Model not found.": "Modelo não encontrado.",
+  "A study pair needs two different students.": "Uma dupla precisa de dois alunos diferentes.",
+  "Training failed or was interrupted. Please try again.": "O treinamento falhou ou foi interrompido. Tente novamente.",
+  "Could not start training.": "Não foi possível iniciar o treinamento.",
+  "The cohort changed during training. Please start a new training run.": "A turma mudou durante o treinamento. Inicie um novo treino.",
+  "Not enough study pairs. Add more students before training.": "Duplas insuficientes. Adicione mais alunos antes de treinar.",
+  "The model did not meet the validation error threshold. Training runs were saved without activation.": "O modelo não atingiu o limite de erro. Treinamentos salvos sem ativação.",
+  "The cohort changed during training. Models were saved without activation.": "A turma mudou durante o treinamento. Modelos salvos sem ativação.",
+  "Training failed. Check the training parameters and try again.": "O treinamento falhou. Confira os parâmetros e tente novamente.",
+  "This record already exists.": "Este registro já existe.",
+  "Enter a valid nonnegative income.": "Informe uma renda válida maior ou igual a zero.",
+  "Name is required": "O nome é obrigatório",
+  "Enter a valid email address": "Informe um e-mail válido",
+  "Income is required": "A renda é obrigatória"
 }

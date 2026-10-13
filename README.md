@@ -61,3 +61,11 @@ Os mesmos parâmetros podem ser informados pela CLI:
 ```bash
 bun run train:matchmaking --learning-rate 0.002 --epochs 100
 ```
+
+## Languages
+
+The frontend defaults to English (`en-US`). The main menu offers Portuguese (`pt-BR`), with the selection persisted in browser storage. Translation catalogs are in `public/locales/`; `public/i18n.js` translates static and dynamically rendered text, accessible labels and placeholders. Dates and numbers follow the chosen locale; currency remains BRL.
+
+## Cloudflare branch
+
+On branch `cloudflare`, the Workers/D1/Vectorize target lives in [cloudflare/](cloudflare/README.md). Use `bun run dev:cloudflare` for this target; the original `bun dev` and PostgreSQL database remain independent. Configure the resources and apply the D1 migrations before starting it.

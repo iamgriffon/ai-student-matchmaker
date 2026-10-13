@@ -27,7 +27,7 @@
         ? `<p>Scores: ${row.scoreBeforeA} → ${row.scoreAfterA} / ${row.scoreBeforeB} → ${row.scoreAfterB}</p><p>Participation: ${row.participationA * PERCENT_SCALE}% / ${row.participationB * PERCENT_SCALE}% · Feedback: ${row.feedbackA}/5 / ${row.feedbackB}/5</p><p>Outcomes recorded on ${escapeHtml(dateText(row.completedAt))}</p>`
         : `<p>Initial scores: ${row.scoreBeforeA} / ${row.scoreBeforeB}</p><button class="secondary" data-outcome-id="${escapeHtml(row.id)}" ${state.busy ? "disabled" : ""}>Record outcomes</button>`;
       const modelBadge = row.modelOutdated ? '<span class="outdated-model-badge">Outdated model</span>' : "";
-      return `<article class="outcome-card"><div class="outcome-heading"><h3>${escapeHtml(members)}</h3>${modelBadge}</div><p>Started on ${escapeHtml(dateText(row.startedAt))}</p>${result}${row.notes ? `<p>${escapeHtml(row.notes)}</p>` : ""}</article>`;
+      return `<article class="outcome-card"><div class="outcome-heading"><h3 data-i18n-skip>${escapeHtml(members)}</h3>${modelBadge}</div><p>Started on ${escapeHtml(dateText(row.startedAt))}</p>${result}${row.notes ? `<p data-i18n-skip>${escapeHtml(row.notes)}</p>` : ""}</article>`;
     }).join("") : '<p class="empty">No study pairs started.</p>';
   }
   async function loadHistory() {

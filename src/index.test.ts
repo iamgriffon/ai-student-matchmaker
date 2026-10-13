@@ -105,7 +105,7 @@ describe("recommendation endpoint", () => {
     database.mocks.upsertPair.mockRejectedValueOnce(new Error("Private database details"));
     const response = await recommend();
     expect(response.status).toBe(500);
-    expect((await response.json()).error).toBe("Não foi possível concluir a operação.");
+    expect((await response.json()).error).toBe("Could not complete the operation.");
     expect(context.studentVectors.dispose).toHaveBeenCalledTimes(1);
   });
 
@@ -172,7 +172,7 @@ describe("training history endpoints", () => {
   test("serves the training view and its script", async () => {
     const page = await fetch(`${baseUrl}/training`);
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain("Histórico de treinamentos");
+    expect(await page.text()).toContain("Training history");
     const script = await fetch(`${baseUrl}/training.js`);
     expect(script.status).toBe(200);
     expect(await script.text()).toContain("/api/trained-models");
@@ -204,7 +204,7 @@ describe("pair creation endpoint", () => {
     database.mocks.trainedFirst.mockResolvedValueOnce(null);
     const response = await start(payload());
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toContain("Treine e ative");
+    expect((await response.json()).error).toContain("Train and activate");
     expect(database.mocks.outcomeCreate).not.toHaveBeenCalled();
   });
   test("rejects creation from recommendations without a model", async () => {

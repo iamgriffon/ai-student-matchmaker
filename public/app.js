@@ -21,7 +21,7 @@ const elements = Object.fromEntries([
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[character]);
-const nameOf = (user) => user.name || "Unnamed student";
+const nameOf = (user) => user.name || window.i18n.t("Unnamed student");
 const initials = (user) => nameOf(user).split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 const avatar = (user) => `<span class="avatar" aria-hidden="true">${escapeHtml(initials(user))}</span>`;
 const scoreOf = (user) => Number(user.score);
@@ -75,7 +75,7 @@ function renderList() {
   }
   elements["student-list"].innerHTML = filtered.length ? filtered.map((user) => `
     <button class="student-row ${state.selectedId === user.id ? "selected" : ""}" data-user-id="${escapeHtml(user.id)}" aria-pressed="${state.selectedId === user.id}">
-      ${avatar(user)}<span class="student-copy"><span class="student-name">${escapeHtml(nameOf(user))}</span><span class="student-summary">Score ${escapeHtml(user.score)} · ${escapeHtml(user.age)} years${user.disability ? " · Disabled" : ""}</span></span>
+      ${avatar(user)}<span class="student-copy"><span class="student-name" data-i18n-skip>${escapeHtml(nameOf(user))}</span><span class="student-summary">Score ${escapeHtml(user.score)} · ${escapeHtml(user.age)} years${user.disability ? " · Disabled" : ""}</span></span>
     </button>`).join("") : `<p class="empty">${query ? "No students match this search." : "No students yet. Add a student to get started."}</p>`;
 }
 
@@ -138,7 +138,7 @@ function renderSelection() {
     return;
   }
   elements["selected-student"].innerHTML = `
-    <div class="selected-header">${avatar(selected)}<div class="selected-copy"><h2>${escapeHtml(nameOf(selected))}</h2><p class="email">${escapeHtml(selected.email)}</p></div><button class="delete-button" id="delete-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Delete student</button></div>
+    <div class="selected-header">${avatar(selected)}<div class="selected-copy"><h2 data-i18n-skip>${escapeHtml(nameOf(selected))}</h2><p class="email">${escapeHtml(selected.email)}</p></div><button class="delete-button" id="delete-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Delete student</button></div>
     <div class="metrics"><div><span class="metric-label">Exam score</span><span class="metric-value">${escapeHtml(selected.score)} <small>/ 100</small></span></div><div><span class="metric-label">Monthly income</span><span class="metric-value">${escapeHtml(incomeOf(selected))}</span></div><div><span class="metric-label">Profile</span><span class="metric-value">${selected.disability ? "Disabled" : "No disability"}</span></div></div>
     <div class="generate-actions"><button class="secondary" id="edit-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Edit student</button><button class="primary" id="generate-recommendations" ${state.busy || state.loading || state.recommendationLoading || state.modelReady !== true || state.trainingBusy ? "disabled" : ""}>${state.recommendationLoading ? "Loading recommendations…" : recommendationCache.has(selected.id) ? "Refresh recommendations" : "Generate recommendations"}</button></div>`;
   if (state.recommendationLoading) {
@@ -162,7 +162,7 @@ function renderSelection() {
     const user = pair.partner;
     const mean = (result.selectedScore + scoreOf(user)) / PAIR_MEMBER_COUNT;
     const canStart = result.canStartPairs && result.model && !pair.outcomeId && !hasStartedPair(result.userId, user.id);
-    return `<article class="recommendation"><span class="rank">${index + 1}</span>${avatar(user)}<div class="recommendation-info"><h3>${escapeHtml(nameOf(user))}</h3><p>Score ${escapeHtml(user.score)} · ${escapeHtml(incomeOf(user))}${user.disability ? " · Disabled" : ""}</p></div><div class="pair-mean"><span>Average score</span>${mean.toLocaleString(window.i18n.locale, { maximumFractionDigits: SCORE_FRACTION_DIGITS })}</div>${canStart ? `<button class="secondary start-pair" data-partner-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>Start study pair</button>` : ""}</article>`;
+    return `<article class="recommendation"><span class="rank">${index + 1}</span>${avatar(user)}<div class="recommendation-info"><h3 data-i18n-skip>${escapeHtml(nameOf(user))}</h3><p>Score ${escapeHtml(user.score)} · ${escapeHtml(incomeOf(user))}${user.disability ? " · Disabled" : ""}</p></div><div class="pair-mean"><span>Average score</span>${mean.toLocaleString(window.i18n.locale, { maximumFractionDigits: SCORE_FRACTION_DIGITS })}</div>${canStart ? `<button class="secondary start-pair" data-partner-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>Start study pair</button>` : ""}</article>`;
   }).join("") : `<p class="empty">${result.evaluatedCount ? "No study pairs meet the criteria." : "Add another student."}</p>`;
 }
 

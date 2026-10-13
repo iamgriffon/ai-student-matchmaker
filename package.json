@@ -27,7 +27,14 @@
     "format": "biome format --write .",
     "train:matchmaking": "bun run scripts/trainMatchmaking.ts",
     "train:matchmaking:compare": "bun run scripts/trainMatchmaking.ts --compare-learning-rates",
-    "import:trained-models": "bun run scripts/importTrainedModels.ts"
+    "import:trained-models": "bun run scripts/importTrainedModels.ts",
+    "dev:cloudflare": "bun run --cwd cloudflare dev",
+    "build:cloudflare": "bun run --cwd cloudflare build",
+    "deploy:cloudflare": "bun run --cwd cloudflare deploy",
+    "cloudflare:generate": "bun run --cwd cloudflare db:generate",
+    "cloudflare:types": "bun run --cwd cloudflare types",
+    "cloudflare:migrate:local": "bun run --cwd cloudflare db:migrate:local",
+    "cloudflare:migrate:remote": "bun run --cwd cloudflare db:migrate:remote"
   },
   "dependencies": {
     "@prisma/composer": "0.28.0",

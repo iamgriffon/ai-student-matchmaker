@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  runtime = "cloudflare"
+}
+datasource db {
+  provider = "sqlite"
+}
+model User {
+  id String @id
+  age Int
+  name String
+  email String @unique
+  score Int
+  income String
+  disability Boolean
+  discount String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  studentVector StudentVector?
+  pairsAsA PairVector[] @relation("PairA")
+  pairsAsB PairVector[] @relation("PairB")
+  outcomesAsA PairOutcome[] @relation("OutcomeA")
+  outcomesAsB PairOutcome[] @relation("OutcomeB")
+  @@map("Users")
+}
+model StudentVector {
+  id String @id
+  userId String @unique
+  contextVersion String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("StudentVectors")
+}
+model PairVector {
+  id String @id
+  vectorId String @unique
+  uploaded Boolean @default(false)
+  userAId String
+  userBId String
+  contextVersion String
+  generation Int
+  userA User @relation("PairA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("PairB", fields: [userBId], references: [id], onDelete: Cascade)
+  @@unique([userAId, userBId])
+  @@index([contextVersion, generation])
+  @@index([userBId])
+  @@map("PairVectors")
+}
+model PairOutcome {
+  id String @id
+  userAId String
+  userBId String
+  contextVersion String
+  encoderVersion String
+  policyVersion String
+  modelId String?
+  imbalance Float
+  academicGap Float
+  incomeDistance Float
+  disabilityDifference Float
+  scoreBeforeA Float
+  scoreBeforeB Float
+  scoreAfterA Float?
+  scoreAfterB Float?
+  participationA Float?
+  participationB Float?
+  feedbackA Int?
+  feedbackB Int?
+  notes String?
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  userA User @relation("OutcomeA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("OutcomeB", fields: [userBId], references: [id], onDelete: Cascade)
+  @@unique([userAId, userBId])
+  @@index([userBId])
+  @@map("PairOutcomes")
+}
+model TrainedModel {
+  id String @id
+  modelId String
+  kind String
+  artifact Json
+  trainingReport Json?
+  activeKey String? @unique
+  jobId String
+  iteration Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([jobId, iteration])
+  @@index([modelId])
+  @@map("TrainedModels")
+}
+model AppState {
+  id String @id
+  revision Int @default(0)
+  vectorGeneration Int @default(0)
+}
+model TrainingJob {
+  id String @id
+  activeKey String? @unique
+  status String
+  message String
+  options Json
+  revision Int
+  generation Int
+  epoch Int @default(0)
+  iteration Int @default(0)
+  iterationCount Int @default(1)
+  totalEpochs Int
+  learningRate Float
+  loss Float?
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+}
+model VectorDeletion {
+  id String @id
+  index String
+  vectorId String
+  @@unique([index, vectorId])
+}
+model Weight {
+  id String @id
+  field String @unique
+  value Float
+  @@map("Weights")
+}
