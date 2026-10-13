@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vestibulandos · Training</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/i18n.js" defer></script>
+    <script src="/training.js" defer></script>
+    <script src="/trainingControls.js" defer></script>
+  </head>
+  <body>
+    <div class="main-menu">
+      <a class="brand" href="/">VESTIBULANDOS</a>
+      <nav class="main-nav" aria-label="Main menu">
+        <a class="nav-link" href="/">Students</a>
+        <a class="nav-link" href="/training" aria-current="page">Training data</a>
+      </nav>
+      <label class="language-picker"><span>Language</span><select data-language-select aria-label="Language"><option value="en-US">English</option><option value="pt-BR">Português</option></select></label>
+    </div>
+    <header class="header">
+      <div><h1>Training history</h1><p>Explore the settings and results of each saved training run.</p></div>
+      <div class="header-actions"><button id="reload-training" class="primary">Refresh history</button></div>
+    </header>
+    <main class="training-main">
+      <section class="panel training-controls" aria-labelledby="training-controls-heading">
+        <div><h2 id="training-controls-heading">Manage training</h2><p id="training-operation-status" role="status" aria-live="polite">Checking model…</p><progress id="training-progress" max="100" aria-label="Training progress" hidden></progress></div>
+        <div class="training-actions"><button id="start-training" class="primary" disabled>Train model</button><button id="clear-training-data" class="danger-button" disabled>Delete vectors and models</button></div>
+        <p class="training-cleanup-note">This removes all pair vectors, models and training reports.</p>
+      </section>
+      <p class="recommendation-explanation">The model learns policy-generated scores. Validation error measures how closely it reproduces those rules, not real student collaboration outcomes.</p>
+      <p id="training-notice" role="status" aria-live="polite">Loading training runs…</p>
+      <div class="training-workspace">
+        <section class="panel" aria-labelledby="training-list-heading">
+          <div class="section-heading"><h2 id="training-list-heading">Training runs</h2><span id="training-count" class="count">—</span></div>
+          <p class="recommendation-explanation">Latest 100 runs. Select one to view details.</p>
+          <div id="training-list" class="training-list" aria-live="polite"></div>
+        </section>
+        <section id="training-detail" class="panel" aria-labelledby="training-detail-heading" aria-live="polite"><p class="empty">Select a training run.</p></section>
+      </div>
+    </main>
+    <dialog id="training-dialog" aria-labelledby="training-form-heading">
+      <form id="training-form">
+        <div class="section-heading"><h2 id="training-form-heading">Train model</h2><button type="button" id="close-training-dialog" class="icon-button" aria-label="Close training">×</button></div>
+        <div class="form-row">
+          <label>Learning rate<input id="training-learning-rate" name="learningRate" type="number" min="0" step="any" value="0.001" required /></label>
+          <label>Iterations<input id="training-epochs" name="epochs" type="number" min="1" step="1" value="80" required /></label>
+        </div>
+        <label class="checkbox"><input id="compare-learning-rates" name="compareLearningRates" type="checkbox" /> Also compare with learning rate 0.01</label>
+        <p id="training-form-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions"><button type="button" id="cancel-training" class="secondary">Cancel</button><button id="submit-training" type="submit" class="primary">Start training</button></div>
+      </form>
+    </dialog>
+  </body>
+</html>

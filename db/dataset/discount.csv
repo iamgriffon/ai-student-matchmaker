@@ -1,0 +1,5 @@
+tipo_desconto_id,nome
+1,Isento
+2,Parcial baixo
+3,Parcial alto
+4,Integral

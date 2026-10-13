@@ -1,0 +1,66 @@
+[
+  {
+    "id": "createNativeEnumType.DataVectorType",
+    "label": "Create enum type \"DataVectorType\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "type",
+        "name": "DataVectorType"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "create enum type \"DataVectorType\"",
+        "sql": "CREATE TYPE \"public\".\"DataVectorType\" AS ENUM ('individual', 'pair', 'cohort')",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "column.public.DataVectors.type",
+    "label": "Add column \"type\" to \"DataVectors\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "type",
+        "table": "DataVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"type\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "DataVectors",
+          "type"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"type\"",
+        "sql": "ALTER TABLE \"public\".\"DataVectors\" ADD COLUMN \"type\" \"DataVectorType\" DEFAULT 'individual'::\"DataVectorType\" NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"type\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "DataVectors",
+          "type"
+        ]
+      }
+    ]
+  }
+]

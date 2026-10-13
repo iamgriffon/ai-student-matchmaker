@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vestibulandos · Study partners</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/i18n.js" defer></script>
+    <script src="/app.js" defer></script>
+    <script src="/outcomes.js" defer></script>
+    <script src="/trainingControls.js" defer></script>
+  </head>
+  <body>
+    <div class="main-menu">
+      <a class="brand" href="/">VESTIBULANDOS</a>
+      <nav class="main-nav" aria-label="Main menu">
+        <a class="nav-link" href="/" aria-current="page">Students</a>
+        <a class="nav-link" href="/training">Training data</a>
+      </nav>
+      <label class="language-picker"><span>Language</span><select data-language-select aria-label="Language"><option value="en-US">English</option><option value="pt-BR">Português</option></select></label>
+    </div>
+    <header class="header">
+      <div><h1>Find a study partner</h1><p>Meet the students and explore study partners.</p></div>
+      <div class="header-actions"><button id="add-student" class="primary">+ Add student</button></div>
+    </header>
+    <main>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <section id="model-required" class="notice model-notice" aria-labelledby="model-required-heading" hidden>
+        <div><h2 id="model-required-heading">Model training required</h2><p id="training-operation-status" role="status" aria-live="polite">Train the model to generate recommendations and start study pairs.</p><progress id="training-progress" max="100" aria-label="Training progress" hidden></progress></div>
+        <button id="start-training" class="primary" disabled>Train model</button>
+      </section>
+      <div class="workspace">
+        <section class="panel students-panel" aria-labelledby="students-heading">
+          <div class="section-heading"><h2 id="students-heading">Students</h2><span id="student-count" class="count">—</span></div>
+          <label class="search-label" for="search">Search by name or email</label>
+          <input id="search" type="search" placeholder="Search students…" autocomplete="off" />
+          <div class="student-sort">
+            <label class="search-label" for="sort-students">Sort by</label>
+            <select id="sort-students">
+              <option value="name-asc">Name · A–Z</option>
+              <option value="name-desc">Name · Z–A</option>
+              <option value="score-desc">Highest score</option>
+              <option value="score-asc">Lowest score</option>
+              <option value="age-asc">Youngest first</option>
+              <option value="age-desc">Oldest first</option>
+              <option value="income-asc">Lowest income</option>
+              <option value="income-desc">Highest income</option>
+            </select>
+          </div>
+          <div id="student-list" class="student-list" aria-live="polite"><p class="empty">Loading students…</p></div>
+          <button id="reload" class="text-button">Refresh list</button>
+        </section>
+        <section id="selection-placeholder" class="panel selection-placeholder" aria-labelledby="selection-placeholder-heading">
+          <div class="selection-placeholder-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="16" r="6" /><path d="M6 37v-3a12 12 0 0 1 24 0v3M32 10a6 6 0 0 1 0 12M36 26a10 10 0 0 1 6 9v2" /></svg>
+          </div>
+          <h2 id="selection-placeholder-heading">Find a study partner</h2>
+          <p>Select a student to explore recommendations and view existing study pairs.</p>
+        </section>
+        <section id="selection-content" class="recommendations-panel" aria-labelledby="recommendations-heading" hidden>
+          <div id="selected-student" class="panel selected-student"><div class="empty large">Select a student.</div></div>
+          <div class="recommendations-heading"><h2 id="recommendations-heading">Recommended partners</h2></div>
+          <p id="recommendation-summary" class="recommendation-summary" role="status" aria-live="polite"></p>
+          <div id="recommendations" class="recommendations" aria-live="polite"><p class="empty">No recommendations yet.</p></div>
+          <section class="panel outcome-panel" aria-labelledby="outcomes-heading">
+            <div class="section-heading"><h2 id="outcomes-heading">Started study pairs</h2><button id="reload-outcomes" class="text-button">Refresh history</button></div>
+            <p id="outcome-notice" role="status" aria-live="polite"></p>
+            <div id="outcome-list"><p class="empty">No study pairs started.</p></div>
+          </section>
+        </section>
+      </div>
+    </main>
+    <dialog id="student-dialog" aria-labelledby="form-heading">
+      <form id="student-form">
+        <div class="section-heading"><h2 id="form-heading">Add student</h2><button type="button" id="close-dialog" class="icon-button" aria-label="Close form">×</button></div>
+        <p class="form-intro">The student will be saved and added to the list.</p>
+        <label>Name<input name="name" autocomplete="name" required maxlength="200" /></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required maxlength="254" /></label>
+        <div class="form-row"><label>Age<input name="age" type="number" min="16" max="80" step="1" required /></label><label>Exam score<input name="score" type="number" min="0" max="100" step="1" required /><small>From 0 to 100</small></label></div>
+        <label>Monthly income (BRL)<input name="income" type="number" min="0" step="0.01" placeholder="0,00" required /></label>
+        <label class="checkbox"><input name="disability" type="checkbox" /> Person with a disability</label>
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions"><button type="button" id="cancel-form" class="secondary">Cancel</button><button type="submit" id="save-student" class="primary">Save student</button></div>
+      </form>
+    </dialog>
+    <dialog id="outcome-dialog" aria-labelledby="outcome-form-heading">
+      <form id="outcome-form">
+        <div class="section-heading"><h2 id="outcome-form-heading">Record outcomes</h2><button type="button" id="close-outcome" class="icon-button" aria-label="Close outcomes">×</button></div>
+        <p class="form-intro">Enter observed outcomes after studying together. This does not change the registered exam score.</p>
+        <fieldset><legend id="outcome-member-a"></legend>
+          <label>Final score (0–100)<input name="scoreAfterA" type="number" min="0" max="100" step="0.1" required /></label>
+          <label>Activity participation (%)<input name="participationA" type="number" min="0" max="100" step="1" required /></label>
+          <label>Pair feedback (1–5)<input name="feedbackA" type="number" min="1" max="5" step="1" required /></label>
+        </fieldset>
+        <fieldset><legend id="outcome-member-b"></legend>
+          <label>Final score (0–100)<input name="scoreAfterB" type="number" min="0" max="100" step="0.1" required /></label>
+          <label>Activity participation (%)<input name="participationB" type="number" min="0" max="100" step="1" required /></label>
+          <label>Pair feedback (1–5)<input name="feedbackB" type="number" min="1" max="5" step="1" required /></label>
+        </fieldset>
+        <label>Notes<textarea name="notes" maxlength="2000" rows="3"></textarea></label>
+        <p id="outcome-form-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions"><button id="save-outcome" type="submit" class="primary">Save outcomes</button></div>
+      </form>
+    </dialog>
+    <dialog id="training-dialog" aria-labelledby="training-form-heading">
+      <form id="training-form">
+        <div class="section-heading"><h2 id="training-form-heading">Train model</h2><button type="button" id="close-training-dialog" class="icon-button" aria-label="Close training">×</button></div>
+        <div class="form-row">
+          <label>Learning rate<input id="training-learning-rate" name="learningRate" type="number" min="0" step="any" value="0.001" required /></label>
+          <label>Iterations<input id="training-epochs" name="epochs" type="number" min="1" step="1" value="80" required /></label>
+        </div>
+        <label class="checkbox"><input id="compare-learning-rates" name="compareLearningRates" type="checkbox" /> Also compare with learning rate 0.01</label>
+        <p id="training-form-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions"><button type="button" id="cancel-training" class="secondary">Cancel</button><button id="submit-training" type="submit" class="primary">Start training</button></div>
+      </form>
+    </dialog>
+  </body>
+</html>

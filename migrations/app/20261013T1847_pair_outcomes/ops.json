@@ -1,0 +1,203 @@
+[
+  {
+    "id": "table.PairOutcomes",
+    "label": "Create table \"PairOutcomes\"",
+    "summary": "Creates table \"PairOutcomes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "PairOutcomes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"PairOutcomes\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairOutcomes\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"PairOutcomes\"",
+        "sql": "CREATE TABLE \"public\".\"PairOutcomes\" (\n  \"completedAt\" text,\n  \"contextVersion\" text NOT NULL,\n  \"encoderVersion\" text NOT NULL,\n  \"feedbackA\" float8,\n  \"feedbackB\" float8,\n  \"id\" character(36) NOT NULL,\n  \"modelId\" text,\n  \"notes\" text,\n  \"participationA\" float8,\n  \"participationB\" float8,\n  \"policyVersion\" text NOT NULL,\n  \"scoreAfterA\" float8,\n  \"scoreAfterB\" float8,\n  \"scoreBeforeA\" float8 NOT NULL,\n  \"scoreBeforeB\" float8 NOT NULL,\n  \"startedAt\" timestamptz NOT NULL,\n  \"userAId\" character(36) NOT NULL,\n  \"userBId\" character(36) NOT NULL,\n  \"vector\" vector(4) NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"complete_observations_e04df2cf\" CHECK ((\"completedAt\" IS NULL AND \"scoreAfterA\" IS NULL AND \"scoreAfterB\" IS NULL AND \"participationA\" IS NULL AND \"participationB\" IS NULL AND \"feedbackA\" IS NULL AND \"feedbackB\" IS NULL) OR (\"completedAt\" IS NOT NULL AND \"scoreAfterA\" IS NOT NULL AND \"scoreAfterB\" IS NOT NULL AND \"participationA\" IS NOT NULL AND \"participationB\" IS NOT NULL AND \"feedbackA\" IS NOT NULL AND \"feedbackB\" IS NOT NULL)),\n  CONSTRAINT \"feedback_ranges_f8fabbc1\" CHECK ((\"feedbackA\" IS NULL OR \"feedbackA\" BETWEEN 1 AND 5) AND (\"feedbackB\" IS NULL OR \"feedbackB\" BETWEEN 1 AND 5)),\n  CONSTRAINT \"ordered_members_f8bc5df7\" CHECK (\"userAId\" < \"userBId\"),\n  CONSTRAINT \"participation_ranges_62455506\" CHECK ((\"participationA\" IS NULL OR \"participationA\" BETWEEN 0 AND 1) AND (\"participationB\" IS NULL OR \"participationB\" BETWEEN 0 AND 1)),\n  CONSTRAINT \"score_ranges_0aab7461\" CHECK (\"scoreBeforeA\" BETWEEN 0 AND 100 AND \"scoreBeforeB\" BETWEEN 0 AND 100 AND (\"scoreAfterA\" IS NULL OR \"scoreAfterA\" BETWEEN 0 AND 100) AND (\"scoreAfterB\" IS NULL OR \"scoreAfterB\" BETWEEN 0 AND 100))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"PairOutcomes\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairOutcomes\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.PairOutcomes.PairOutcomes_userAId_idx_96e77d1b",
+    "label": "Create index \"PairOutcomes_userAId_idx_96e77d1b\" on \"PairOutcomes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "PairOutcomes_userAId_idx_96e77d1b",
+        "table": "PairOutcomes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"PairOutcomes_userAId_idx_96e77d1b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairOutcomes_userAId_idx_96e77d1b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"PairOutcomes_userAId_idx_96e77d1b\"",
+        "sql": "CREATE INDEX \"PairOutcomes_userAId_idx_96e77d1b\" ON \"public\".\"PairOutcomes\" (\"userAId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"PairOutcomes_userAId_idx_96e77d1b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairOutcomes_userAId_idx_96e77d1b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.PairOutcomes.PairOutcomes_userBId_idx_2ac770a6",
+    "label": "Create index \"PairOutcomes_userBId_idx_2ac770a6\" on \"PairOutcomes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "PairOutcomes_userBId_idx_2ac770a6",
+        "table": "PairOutcomes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"PairOutcomes_userBId_idx_2ac770a6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairOutcomes_userBId_idx_2ac770a6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"PairOutcomes_userBId_idx_2ac770a6\"",
+        "sql": "CREATE INDEX \"PairOutcomes_userBId_idx_2ac770a6\" ON \"public\".\"PairOutcomes\" (\"userBId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"PairOutcomes_userBId_idx_2ac770a6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairOutcomes_userBId_idx_2ac770a6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.PairOutcomes.PairOutcomes_userAId_fkey",
+    "label": "Add foreign key \"PairOutcomes_userAId_fkey\" on \"PairOutcomes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "PairOutcomes_userAId_fkey",
+        "table": "PairOutcomes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"PairOutcomes_userAId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairOutcomes_userAId_fkey",
+          "public",
+          "\"public\".\"PairOutcomes\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"PairOutcomes_userAId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"PairOutcomes\"\nADD CONSTRAINT \"PairOutcomes_userAId_fkey\"\nFOREIGN KEY (\"userAId\")\nREFERENCES \"public\".\"Users\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"PairOutcomes_userAId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairOutcomes_userAId_fkey",
+          "public",
+          "\"public\".\"PairOutcomes\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.PairOutcomes.PairOutcomes_userBId_fkey",
+    "label": "Add foreign key \"PairOutcomes_userBId_fkey\" on \"PairOutcomes\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "PairOutcomes_userBId_fkey",
+        "table": "PairOutcomes"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"PairOutcomes_userBId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairOutcomes_userBId_fkey",
+          "public",
+          "\"public\".\"PairOutcomes\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"PairOutcomes_userBId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"PairOutcomes\"\nADD CONSTRAINT \"PairOutcomes_userBId_fkey\"\nFOREIGN KEY (\"userBId\")\nREFERENCES \"public\".\"Users\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"PairOutcomes_userBId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairOutcomes_userBId_fkey",
+          "public",
+          "\"public\".\"PairOutcomes\""
+        ]
+      }
+    ]
+  }
+]

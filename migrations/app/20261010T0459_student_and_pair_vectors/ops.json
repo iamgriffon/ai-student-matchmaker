@@ -1,0 +1,388 @@
+[
+  {
+    "id": "dropTable.DataVectors",
+    "label": "Drop table \"DataVectors\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "DataVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"DataVectors\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"DataVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"DataVectors\"",
+        "sql": "DROP TABLE \"public\".\"DataVectors\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"DataVectors\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"DataVectors\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropNativeEnumType.DataVectorType",
+    "label": "Drop enum type \"DataVectorType\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "type",
+        "name": "DataVectorType"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "drop enum type \"DataVectorType\"",
+        "sql": "DROP TYPE \"public\".\"DataVectorType\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.PairVectors",
+    "label": "Create table \"PairVectors\"",
+    "summary": "Creates table \"PairVectors\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "PairVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"PairVectors\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"PairVectors\"",
+        "sql": "CREATE TABLE \"public\".\"PairVectors\" (\n  \"contextVersion\" text NOT NULL,\n  \"createdAt\" timestamptz NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"userAId\" character(36) NOT NULL,\n  \"userBId\" character(36) NOT NULL,\n  \"vector\" vector(4) NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"ordered_members_f8bc5df7\" CHECK (\"userAId\" < \"userBId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"PairVectors\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.StudentVectors",
+    "label": "Create table \"StudentVectors\"",
+    "summary": "Creates table \"StudentVectors\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "StudentVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"StudentVectors\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"StudentVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"StudentVectors\"",
+        "sql": "CREATE TABLE \"public\".\"StudentVectors\" (\n  \"createdAt\" timestamptz NOT NULL,\n  \"discount\" int8 NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"userId\" character(36) NOT NULL,\n  \"vector\" vector(3) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"StudentVectors\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"StudentVectors\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.PairVectors.PairVectors_userAId_userBId_key",
+    "label": "Add unique constraint on \"PairVectors\" (userAId, userBId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "PairVectors_userAId_userBId_key",
+        "table": "PairVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"PairVectors_userAId_userBId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairVectors_userAId_userBId_key",
+          "public",
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"PairVectors_userAId_userBId_key\"",
+        "sql": "ALTER TABLE \"public\".\"PairVectors\" ADD CONSTRAINT \"PairVectors_userAId_userBId_key\" UNIQUE (\"userAId\", \"userBId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"PairVectors_userAId_userBId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairVectors_userAId_userBId_key",
+          "public",
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.StudentVectors.StudentVectors_userId_key",
+    "label": "Add unique constraint on \"StudentVectors\" (userId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "StudentVectors_userId_key",
+        "table": "StudentVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"StudentVectors_userId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "StudentVectors_userId_key",
+          "public",
+          "\"public\".\"StudentVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"StudentVectors_userId_key\"",
+        "sql": "ALTER TABLE \"public\".\"StudentVectors\" ADD CONSTRAINT \"StudentVectors_userId_key\" UNIQUE (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"StudentVectors_userId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "StudentVectors_userId_key",
+          "public",
+          "\"public\".\"StudentVectors\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.PairVectors.PairVectors_userBId_idx_2ac770a6",
+    "label": "Create index \"PairVectors_userBId_idx_2ac770a6\" on \"PairVectors\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "PairVectors_userBId_idx_2ac770a6",
+        "table": "PairVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"PairVectors_userBId_idx_2ac770a6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairVectors_userBId_idx_2ac770a6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"PairVectors_userBId_idx_2ac770a6\"",
+        "sql": "CREATE INDEX \"PairVectors_userBId_idx_2ac770a6\" ON \"public\".\"PairVectors\" (\"userBId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"PairVectors_userBId_idx_2ac770a6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"PairVectors_userBId_idx_2ac770a6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.PairVectors.PairVectors_userAId_fkey",
+    "label": "Add foreign key \"PairVectors_userAId_fkey\" on \"PairVectors\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "PairVectors_userAId_fkey",
+        "table": "PairVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"PairVectors_userAId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairVectors_userAId_fkey",
+          "public",
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"PairVectors_userAId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"PairVectors\"\nADD CONSTRAINT \"PairVectors_userAId_fkey\"\nFOREIGN KEY (\"userAId\")\nREFERENCES \"public\".\"Users\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"PairVectors_userAId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairVectors_userAId_fkey",
+          "public",
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.PairVectors.PairVectors_userBId_fkey",
+    "label": "Add foreign key \"PairVectors_userBId_fkey\" on \"PairVectors\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "PairVectors_userBId_fkey",
+        "table": "PairVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"PairVectors_userBId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairVectors_userBId_fkey",
+          "public",
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"PairVectors_userBId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"PairVectors\"\nADD CONSTRAINT \"PairVectors_userBId_fkey\"\nFOREIGN KEY (\"userBId\")\nREFERENCES \"public\".\"Users\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"PairVectors_userBId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "PairVectors_userBId_fkey",
+          "public",
+          "\"public\".\"PairVectors\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.StudentVectors.StudentVectors_userId_fkey",
+    "label": "Add foreign key \"StudentVectors_userId_fkey\" on \"StudentVectors\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "StudentVectors_userId_fkey",
+        "table": "StudentVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"StudentVectors_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "StudentVectors_userId_fkey",
+          "public",
+          "\"public\".\"StudentVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"StudentVectors_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"StudentVectors\"\nADD CONSTRAINT \"StudentVectors_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"Users\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"StudentVectors_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "StudentVectors_userId_fkey",
+          "public",
+          "\"public\".\"StudentVectors\""
+        ]
+      }
+    ]
+  }
+]

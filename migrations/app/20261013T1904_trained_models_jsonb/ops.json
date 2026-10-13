@@ -1,0 +1,122 @@
+[
+  {
+    "id": "table.TrainedModels",
+    "label": "Create table \"TrainedModels\"",
+    "summary": "Creates table \"TrainedModels\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "TrainedModels"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"TrainedModels\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainedModels\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"TrainedModels\"",
+        "sql": "CREATE TABLE \"public\".\"TrainedModels\" (\n  \"activeKey\" text,\n  \"artifact\" jsonb NOT NULL,\n  \"createdAt\" timestamptz NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"kind\" text NOT NULL,\n  \"modelId\" text NOT NULL,\n  \"trainingReport\" jsonb,\n  \"updatedAt\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"active_kind_13263b1f\" CHECK (\"activeKey\" IS NULL OR \"activeKey\" = \"kind\"),\n  CONSTRAINT \"artifact_identity_4b8c96e6\" CHECK (jsonb_typeof(\"artifact\") = 'object' AND (\"artifact\" #>> '{metadata,modelId}') IS NOT NULL AND \"modelId\" = \"artifact\" #>> '{metadata,modelId}'),\n  CONSTRAINT \"report_object_53868cbb\" CHECK (\"trainingReport\" IS NULL OR jsonb_typeof(\"trainingReport\") = 'object')\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"TrainedModels\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainedModels\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.TrainedModels.TrainedModels_activeKey_key",
+    "label": "Add unique constraint on \"TrainedModels\" (activeKey)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "TrainedModels_activeKey_key",
+        "table": "TrainedModels"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"TrainedModels_activeKey_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainedModels_activeKey_key",
+          "public",
+          "\"public\".\"TrainedModels\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"TrainedModels_activeKey_key\"",
+        "sql": "ALTER TABLE \"public\".\"TrainedModels\" ADD CONSTRAINT \"TrainedModels_activeKey_key\" UNIQUE (\"activeKey\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"TrainedModels_activeKey_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "TrainedModels_activeKey_key",
+          "public",
+          "\"public\".\"TrainedModels\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.TrainedModels.TrainedModels_modelId_idx_a8222b0e",
+    "label": "Create index \"TrainedModels_modelId_idx_a8222b0e\" on \"TrainedModels\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "TrainedModels_modelId_idx_a8222b0e",
+        "table": "TrainedModels"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"TrainedModels_modelId_idx_a8222b0e\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainedModels_modelId_idx_a8222b0e\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"TrainedModels_modelId_idx_a8222b0e\"",
+        "sql": "CREATE INDEX \"TrainedModels_modelId_idx_a8222b0e\" ON \"public\".\"TrainedModels\" (\"modelId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"TrainedModels_modelId_idx_a8222b0e\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"TrainedModels_modelId_idx_a8222b0e\""
+        ]
+      }
+    ]
+  }
+]

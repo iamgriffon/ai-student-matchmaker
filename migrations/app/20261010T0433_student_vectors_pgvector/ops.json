@@ -1,0 +1,90 @@
+[
+  {
+    "id": "alterType.DataVectors.vector",
+    "label": "Alter type of \"DataVectors\".\"vector\" to vector(3)",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "vector",
+        "table": "DataVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"vector\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "DataVectors",
+          "vector"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "alter type of \"vector\"",
+        "sql": "ALTER TABLE \"public\".\"DataVectors\" ALTER COLUMN \"vector\" TYPE vector(3) USING \"vector\"::vector(3)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"vector\" has type \"vector(3)\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "DataVectors",
+          "vector",
+          "vector(3)"
+        ]
+      }
+    ],
+    "meta": {
+      "warning": "TABLE_REWRITE"
+    }
+  },
+  {
+    "id": "unique.DataVectors.DataVectors_userId_key",
+    "label": "Add unique constraint on \"DataVectors\" (userId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "DataVectors_userId_key",
+        "table": "DataVectors"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"DataVectors_userId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "DataVectors_userId_key",
+          "public",
+          "\"public\".\"DataVectors\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"DataVectors_userId_key\"",
+        "sql": "ALTER TABLE \"public\".\"DataVectors\" ADD CONSTRAINT \"DataVectors_userId_key\" UNIQUE (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"DataVectors_userId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "DataVectors_userId_key",
+          "public",
+          "\"public\".\"DataVectors\""
+        ]
+      }
+    ]
+  }
+]
