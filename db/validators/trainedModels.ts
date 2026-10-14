@@ -88,6 +88,7 @@ export const rankerArtifactSchema = z.object({
 
 export const trainingReportSchema = z.object({
   labelSource: z.literal("policy-generated"), validationStrategy: z.enum(["pair-holdout", "student-disjoint"]),
+  batchSize: z.number().int().positive().optional(),
   architecture: z.array(z.number().int().positive()).optional(), epochs: z.number().int().positive().optional(),
   trainingStudents: z.number().int().positive(), validationStudents: z.number().int().positive(),
   trainingPairs: z.number().int().positive(), validationPairs: z.number().int().positive(),

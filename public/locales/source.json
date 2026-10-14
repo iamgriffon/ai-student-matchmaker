@@ -187,5 +187,9 @@
   "Show local command": "Show local command",
   "Run this command in your local project:": "Run this command in your local project:",
   "Training access key": "Training access key",
-  "Invalid training access key.": "Invalid training access key."
+  "Invalid training access key.": "Invalid training access key.",
+  "Batch size": "Batch size",
+  "Tensor memory: {memory} MiB": "Tensor memory: {memory} MiB",
+  "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}",
+  "Training exceeded the Worker CPU limit.": "Training exceeded the Worker CPU limit."
 }

@@ -7,6 +7,7 @@ import { parseUserId, cohort, synchronizeStudentVectors } from "./vectors.ts";
 import { recommendPartners } from "./matchmaking.ts";
 import { startPairOutcome, completePairOutcome, listPairOutcomes } from "./pairOutcomes.ts";
 import { startTraining, clearTrainingData, latestTraining } from "./training.ts";
+import { trainingStream } from "./trainingStream.ts";
 import { requireTrainingAuthorization } from "./trainingAuthorization.ts";
 export { TrainingWorkflow } from "./trainingWorkflow.ts";
 
@@ -86,18 +87,23 @@ export default {
         cleanupVectors(env, ctx);
         return json(HTTP.ok, result);
       }
+      if (path === "/api/training/events") {
+        if (request.method !== "GET") return methodError("GET");
+        return trainingStream(request, env);
+      }
       if (path === "/api/train" && !["POST", "DELETE"].includes(request.method)) return methodError("POST, DELETE");
       if (path === "/api/training" || path === "/api/train") {
         if (request.method === "GET") {
           const [model, training] = await Promise.all([activeModel(db), latestTraining(env)]);
           cleanupVectors(env, ctx);
-          return json(HTTP.ok, { training, executor: "workflow", trainingEndpoint: "/api/train", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
+          return json(HTTP.ok, { training, executor: "workflow", trainingEndpoint: "/api/train", trainingStream: "/api/training/events", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
           await requireTrainingAuthorization(request, env);
           const options = trainingOptionsSchema.parse({
             learningRate: url.searchParams.get("learningRate") ?? undefined,
             epochs: url.searchParams.get("epochs") ?? undefined,
+            batchSize: url.searchParams.get("batchSize") ?? undefined,
             compareLearningRates: z.enum(["true", "false"]).default("false").parse(url.searchParams.get("compareLearningRates") ?? undefined) === "true",
           });
           return json(HTTP.accepted, { training: await startTraining(env, options) });

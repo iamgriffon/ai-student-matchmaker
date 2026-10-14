@@ -34,7 +34,7 @@ const server = Bun.serve({
       if (active) return json(HTTP.conflict, { error: "A training process is already running." });
       // Fixed executable and validated arguments: HTTP callers never supply a shell command.
       const args = [process.execPath, "run", TRAINER_SCRIPT, "--job-id", jobId,
-        "--learning-rate", String(options.learningRate), "--epochs", String(options.epochs)];
+        "--learning-rate", String(options.learningRate), "--epochs", String(options.epochs), "--batch-size", String(options.batchSize)];
       if (options.compareLearningRates) args.push("--compare-learning-rates");
       const child = Bun.spawn(args, { cwd: PROJECT_ROOT, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
       active = { jobId, child };

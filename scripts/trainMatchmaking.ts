@@ -15,14 +15,15 @@ import { trainingOptionsSchema } from "../src/trainingOptions.ts";
 const MIN_PARTITION_PAIRS = 200;
 const POPULATION_ANCHORS_PER_GROUP = 2;
 const COMPARISON_LEARNING_RATE = 0.01;
+const BATCH_PROGRESS_INTERVAL = 5;
 const PROGRESS_EPOCH_INTERVAL = 10;
 const DISPLAY_EPOCH_OFFSET = 1;
 const LOSS_DISPLAY_DIGITS = 6;
 const { values } = parseArgs({ args: process.argv.slice(2), options: {
-  "learning-rate": { type: "string" }, epochs: { type: "string" },
+  "learning-rate": { type: "string" }, "batch-size": { type: "string" }, epochs: { type: "string" },
   "compare-learning-rates": { type: "boolean", default: false },
 } });
-const options = trainingOptionsSchema.parse({ learningRate: values["learning-rate"], epochs: values.epochs, compareLearningRates: values["compare-learning-rates"] });
+const options = trainingOptionsSchema.parse({ learningRate: values["learning-rate"], epochs: values.epochs, batchSize: values["batch-size"], compareLearningRates: values["compare-learning-rates"] });
 const compareLearningRates = options.compareLearningRates;
 const learningRates = compareLearningRates
   ? [...new Set([COMPARISON_LEARNING_RATE, options.learningRate])]
@@ -63,11 +64,17 @@ try {
     reportTrainingProgress({ message: `Training with learning rate ${learningRate}…`, learningRate, epoch: 0, ...progressContext });
     const lossHistory: { epoch: number; loss: number }[] = [];
     const trained = await trainPairRanker(training, context.contextVersion, {
-      learningRate, epochs: options.epochs, validationSamples: validation,
+      learningRate, epochs: options.epochs, batchSize: options.batchSize, validationSamples: validation,
+      onBatch: ({ epoch, batch, totalBatches, processedSamples, sampleCount, loss, tensorBytes, numTensors }) => {
+        if (batch === DISPLAY_EPOCH_OFFSET || batch === totalBatches || batch % BATCH_PROGRESS_INTERVAL === 0) {
+          reportTrainingProgress({ message: `Training ${progressContext.iteration}/${progressContext.iterationCount} · iteration ${epoch + DISPLAY_EPOCH_OFFSET}/${options.epochs} · batch ${batch}/${totalBatches}`,
+            epoch, batch, totalBatches, processedSamples, sampleCount, loss, tensorBytes, numTensors, learningRate, ...progressContext });
+        }
+      },
       onEpoch: (epoch, loss) => {
         const displayedEpoch = epoch + DISPLAY_EPOCH_OFFSET;
         lossHistory.push({ epoch: displayedEpoch, loss });
-        reportTrainingProgress({ message: `Training ${progressContext.iteration}/${progressContext.iterationCount} · iteration ${displayedEpoch}/${options.epochs}`, epoch: displayedEpoch, learningRate, loss, ...progressContext });
+        reportTrainingProgress({ message: `Training ${progressContext.iteration}/${progressContext.iterationCount} · iteration ${displayedEpoch}/${options.epochs}`, epoch: displayedEpoch, batch: 0, learningRate, loss, ...progressContext });
         if (displayedEpoch % PROGRESS_EPOCH_INTERVAL === 0) {
           console.log(`LR ${learningRate}, iteração ${displayedEpoch}: MSE ${loss.toFixed(LOSS_DISPLAY_DIGITS)}`);
         }
@@ -84,7 +91,7 @@ try {
     const saved = await saveTrainedModel(iteration.artifact, { trainingReport: {
       modelId: metadata.modelId, labelSource: metadata.labelSource, validationStrategy: "student-disjoint",
       architecture: [PAIR_RANKER_INPUT_COUNT, ...iteration.artifact.modelTopology.config.layers.map((layer) => layer.config.units)],
-      epochs: metadata.epochs, trainingStudents: ids.trainingIds.size, validationStudents: ids.validationIds.size,
+      epochs: metadata.epochs, batchSize: options.batchSize, trainingStudents: ids.trainingIds.size, validationStudents: ids.validationIds.size,
       trainingPairs: training.length, validationPairs: validation.length, excludedCrossGroupPairs: split.excludedCount,
       comparisons, lossHistory: iteration.lossHistory,
     } });

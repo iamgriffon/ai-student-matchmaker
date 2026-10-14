@@ -22,6 +22,7 @@ type TrainingStatus = {
   totalEpochs?: number;
   iteration?: number;
   iterationCount?: number;
+  batch?: number; totalBatches?: number; processedSamples?: number; sampleCount?: number; tensorBytes?: number; numTensors?: number;
 };
 let status: TrainingStatus = { status: "idle", message: "", startedAt: null, finishedAt: null };
 
@@ -52,12 +53,12 @@ export async function clearTrainingData() {
   }
 }
 
-export function startTraining(options: { learningRate?: number; epochs?: number; compareLearningRates?: boolean } = {}) {
+export function startTraining(options: { learningRate?: number; epochs?: number; batchSize?: number; compareLearningRates?: boolean } = {}) {
   const parsed = trainingOptionsSchema.parse(options);
   requireIdle();
   status = { status: "running", message: "Preparing pair vectors…", startedAt: new Date().toISOString(), finishedAt: null };
   const executable = typeof process.versions.bun == 'undefined' ? "bun" : process.execPath;
-  const args = ["run", fileURLToPath(TRAINING_ENTRYPOINT), "--learning-rate", String(parsed.learningRate), "--epochs", String(parsed.epochs)];
+  const args = ["run", fileURLToPath(TRAINING_ENTRYPOINT), "--learning-rate", String(parsed.learningRate), "--epochs", String(parsed.epochs), "--batch-size", String(parsed.batchSize)];
   if (parsed.compareLearningRates) args.push(COMPARE_LEARNING_RATES_FLAG);
   const child = spawn(executable, args, {
     cwd: fileURLToPath(APPLICATION_WORKING_DIRECTORY),

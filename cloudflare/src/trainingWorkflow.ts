@@ -19,6 +19,7 @@ const COMPARISON_LEARNING_RATE = 0.01;
 const FIRST_ITERATION = 1;
 const MAX_TRAINING_PAIRS = 3000;
 const MAX_VALIDATION_PAIRS = 1000;
+const BATCH_PROGRESS_INTERVAL = 10;
 const TRAINING_STEP_TIMEOUT = "15 minutes";
 
 async function samplesForTraining(env: Env, context: Cohort) {
@@ -47,19 +48,26 @@ async function samplesForTraining(env: Env, context: Cohort) {
   await savePairFeatures(env, context, [...training, ...validation]);
   // Read persisted vector values when available; recent writes may not be indexed yet.
   const db = database(env);
-  const rows = await db.pairVector.findMany({ where: { contextVersion: context.contextVersion, generation: context.generation } });
-  const persisted = new Map<string, readonly number[]>();
-  for (let offset = 0; offset < rows.length; offset += VECTORIZE_READ_BATCH_SIZE) {
-    const batch = rows.slice(offset, offset + VECTORIZE_READ_BATCH_SIZE);
-    const vectors = await env.PAIR_INDEX.getByIds(batch.map((row) => row.vectorId));
+  const selectedPairs = [...training, ...validation];
+  // Fetch only the sampled pairs, in bounded SQL and Vectorize batches.
+  for (let offset = 0; offset < selectedPairs.length; offset += VECTORIZE_READ_BATCH_SIZE) {
+    const batch = selectedPairs.slice(offset, offset + VECTORIZE_READ_BATCH_SIZE);
+    const rows = await db.pairVector.findMany({ where: {
+      contextVersion: context.contextVersion, generation: context.generation,
+      OR: batch.map(({ userAId, userBId }) => ({ userAId, userBId })),
+    } });
+    if (rows.length !== batch.length) throw new HttpError(409, "The pair dataset changed while preparing training.");
+    const vectors = await env.PAIR_INDEX.getByIds(rows.map((row) => row.vectorId));
     const byId = new Map(vectors.map((vector) => [vector.id, vector.values]));
-    for (const row of batch) {
-      const values = byId.get(row.vectorId);
-      if (typeof values != 'undefined') persisted.set(`${row.userAId}:${row.userBId}`, decodePairVectorizeValues(values));
+    const byMembers = new Map(rows.map((row) => [`${row.userAId}:${row.userBId}`, row.vectorId]));
+    for (const pair of batch) {
+      const vectorId = byMembers.get(`${pair.userAId}:${pair.userBId}`);
+      const values = typeof vectorId == 'undefined' ? undefined : byId.get(vectorId);
+      if (typeof values != 'undefined') pair.features = decodePairVectorizeValues(values);
     }
   }
   const toSample = (pair: typeof pairs[number]) => {
-    const features = readPairFeatures(persisted.get(`${pair.userAId}:${pair.userBId}`) ?? pair.features);
+    const features = readPairFeatures(pair.features);
     const evaluation = evaluatePair(features);
     return { features, target: evaluation.score, eligible: evaluation.eligible, userAId: pair.userAId, userBId: pair.userBId };
   };
@@ -88,14 +96,25 @@ export class TrainingWorkflow extends WorkflowEntrypoint<Env, { jobId: string }>
           const dataset = await samplesForTraining(this.env, context);
           await prepareTrainingBackend();
           const lossHistory: { epoch: number; loss: number }[] = [];
+          let lastBatchProgress: Record<string, number> | undefined;
           const trained = await trainPairRanker(dataset.training, context.contextVersion, {
-            learningRate, epochs: job.options.epochs, validationSamples: dataset.validation,
+            learningRate, epochs: job.options.epochs, batchSize: job.options.batchSize, validationSamples: dataset.validation,
+            onBatch: async ({ epoch, batch, totalBatches, processedSamples, sampleCount, loss, tensorBytes, numTensors }) => {
+              lastBatchProgress = { batch, totalBatches, processedSamples, sampleCount, tensorBytes, numTensors };
+              if (batch !== FIRST_ITERATION && batch !== totalBatches && batch % BATCH_PROGRESS_INTERVAL !== 0) return;
+              const result = await this.env.DB.prepare(`UPDATE TrainingJob SET message = ?, epoch = ?, iteration = ?, iterationCount = ?, learningRate = ?, loss = ?, options = json_set(options, '$.batchProgress', json(?))
+                WHERE id = ? AND status = 'running' AND EXISTS (SELECT 1 FROM AppState WHERE id = ? AND revision = ? AND vectorGeneration = ?)`)
+                .bind(`Training ${iteration}/${learningRates.length} · iteration ${epoch + FIRST_ITERATION}/${job.options.epochs} · batch ${batch}/${totalBatches}`,
+                  epoch, iteration, learningRates.length, learningRate, loss, JSON.stringify(lastBatchProgress), jobId, APP_STATE_ID, job.revision, job.generation).run();
+              if (!result.meta.changes) throw new HttpError(409, "The cohort changed or training was stopped.");
+            },
             onEpoch: async (epoch, loss) => {
               const displayed = epoch + FIRST_ITERATION;
               lossHistory.push({ epoch: displayed, loss });
               await db.trainingJob.update({ where: { id: jobId }, data: {
                 message: `Training ${iteration}/${learningRates.length} · iteration ${displayed}/${job.options.epochs}`,
                 epoch: displayed, iteration, iterationCount: learningRates.length, learningRate, loss,
+                options: { ...job.options, batchProgress: { ...lastBatchProgress, batch: 0 } },
               } });
             },
           });
@@ -104,7 +123,7 @@ export class TrainingWorkflow extends WorkflowEntrypoint<Env, { jobId: string }>
             const payload = parseModelPayload(artifact, {
               modelId: artifact.metadata.modelId, labelSource: artifact.metadata.labelSource, validationStrategy: "student-disjoint",
               architecture: [PAIR_RANKER_INPUT_COUNT, ...artifact.modelTopology.config.layers.map((layer) => layer.config.units)],
-              epochs: job.options.epochs, trainingStudents: dataset.ids.trainingIds.size, validationStudents: dataset.ids.validationIds.size,
+              epochs: job.options.epochs, batchSize: job.options.batchSize, trainingStudents: dataset.ids.trainingIds.size, validationStudents: dataset.ids.validationIds.size,
               trainingPairs: dataset.training.length, validationPairs: dataset.validation.length, excludedCrossGroupPairs: dataset.excludedCount,
               comparisons: [artifact.metadata], lossHistory,
             });
@@ -145,7 +164,7 @@ export class TrainingWorkflow extends WorkflowEntrypoint<Env, { jobId: string }>
     } catch (error) {
       console.error(JSON.stringify({ event: "training-failed", jobId, message: error instanceof Error ? error.message : String(error) }));
       await db.trainingJob.update({ where: { id: jobId }, data: {
-        activeKey: null, status: "failed", message: error instanceof HttpError ? error.message : "Training failed. Check the training parameters and try again.", finishedAt: new Date(),
+        activeKey: null, status: "failed", message: error instanceof HttpError ? error.message : error instanceof Error && error.message.includes("CPU time limit") ? "Training exceeded the Worker CPU limit." : "Training failed. Check the training parameters and try again.", finishedAt: new Date(),
       } });
       throw error;
     }

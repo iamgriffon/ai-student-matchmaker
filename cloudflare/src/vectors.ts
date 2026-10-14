@@ -43,10 +43,13 @@ export async function synchronizeStudentVectors(env: Env, context: Cohort) {
 }
 export async function savePairFeatures(env: Env, context: Cohort, pairs: readonly { userAId: string; userBId: string; features: readonly number[] }[]) {
   const db = database(env);
-  const existing = await db.pairVector.findMany({ where: { contextVersion: context.contextVersion, generation: context.generation } });
-  const existingByMembers = new Map(existing.map((row) => [`${row.userAId}:${row.userBId}`, row]));
   for (let offset = 0; offset < pairs.length; offset += VECTOR_BATCH_SIZE) {
     const prepared = await Promise.all(pairs.slice(offset, offset + VECTOR_BATCH_SIZE).map(async (pair) => ({ ...pair, vectorId: await vectorId(`${context.generation}:${context.revision}:${context.contextVersion}:${Object.values(orderedMembers(pair.userAId, pair.userBId)).join(":")}`) })));
+    const existing = await db.pairVector.findMany({ where: {
+      contextVersion: context.contextVersion, generation: context.generation,
+      OR: prepared.map((pair) => orderedMembers(pair.userAId, pair.userBId)),
+    } });
+    const existingByMembers = new Map(existing.map((row) => [`${row.userAId}:${row.userBId}`, row]));
     const batch = prepared.filter((pair) => {
       const members = orderedMembers(pair.userAId, pair.userBId);
       const stored = existingByMembers.get(`${members.userAId}:${members.userBId}`);

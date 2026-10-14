@@ -85,6 +85,7 @@ export const server = createServer(async (request, response) => {
           compareLearningRates,
           learningRate: url.searchParams.get("learningRate") ?? undefined,
           epochs: url.searchParams.get("epochs") ?? undefined,
+          batchSize: url.searchParams.get("batchSize") ?? undefined,
         });
         json(202, { training: startTraining(options) });
       } else if (request.method === "DELETE") {

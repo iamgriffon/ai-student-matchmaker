@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { trainingOptionsSchema } from "../../src/trainingOptions.ts";
 import { database, HttpError, ACTIVE_OPERATION_KEY, APP_STATE_ID } from "./database.ts";
 import type { TrainingJob } from "./generated/prisma/client.ts";
@@ -5,13 +6,19 @@ import type { TrainingJob } from "./generated/prisma/client.ts";
 const EXTERNAL_HEARTBEAT_TIMEOUT_MS = 15 * 60_000;
 
 export type TrainingOptions = ReturnType<typeof trainingOptionsSchema.parse>;
+const batchProgressSchema = z.object({
+  batch: z.number().int().nonnegative(), totalBatches: z.number().int().positive(),
+  processedSamples: z.number().int().nonnegative(), sampleCount: z.number().int().positive(),
+  tensorBytes: z.number().int().nonnegative(), numTensors: z.number().int().nonnegative(),
+});
 export function trainingStatus(job: TrainingJob | null) {
-  return job ? { status: job.status, message: job.message, startedAt: job.startedAt, finishedAt: job.finishedAt,
+  const progress = z.object({ batchProgress: batchProgressSchema.optional() }).safeParse(job?.options);
+  const batchProgress = progress.success ? progress.data.batchProgress : undefined;
+  return job ? { jobId: job.id, ...batchProgress, status: job.status, message: job.message, startedAt: job.startedAt, finishedAt: job.finishedAt,
     epoch: job.epoch, totalEpochs: job.totalEpochs, iteration: job.iteration, iterationCount: job.iterationCount,
     learningRate: job.learningRate, loss: job.loss } : { status: "idle", message: "", startedAt: null, finishedAt: null };
 }
-export async function latestTraining(env: Env) {
-  const db = database(env);
+export async function latestTraining(env: Env, db = database(env)) {
   let job = await db.trainingJob.findFirst({ orderBy: { startedAt: "desc" } });
   const externallyTrained = job?.options && typeof job.options === "object" && !Array.isArray(job.options) && job.options.executor === "external";
   if (job?.status === "running" && externallyTrained) {

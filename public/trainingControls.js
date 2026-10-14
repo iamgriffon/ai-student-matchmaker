@@ -2,12 +2,15 @@
   const POLL_INTERVAL_MS = 2000;
   const PROGRESS_PERCENT_MAX = 100;
   const FIRST_ITERATION = 1;
+  const BYTES_PER_MIB = 1024 * 1024;
+  const MEMORY_PRECISION = 2;
   const start = document.getElementById("start-training");
   const clear = document.getElementById("clear-training-data");
   const compare = document.getElementById("compare-learning-rates");
   const dialog = document.getElementById("training-dialog");
   const form = document.getElementById("training-form");
   const learningRateInput = document.getElementById("training-learning-rate");
+  const batchSizeInput = document.getElementById("training-batch-size");
   const epochsInput = document.getElementById("training-epochs");
   const formError = document.getElementById("training-form-error");
   const submit = document.getElementById("submit-training");
@@ -22,10 +25,53 @@
   let timer = null;
   let lastStatus = null;
   let useTrainEndpoint = false;
+  let lastSnapshot = null;
+  let trackingStream = null;
+  let trackingJobId = null;
+  let streamFallbackJobId = null;
+
+  function closeTrackingStream() {
+    trackingStream?.close();
+    trackingStream = null;
+    trackingJobId = null;
+  }
+  function trackWithStream(data) {
+    if (!data.trainingStream || typeof EventSource == 'undefined') return false;
+    const jobId = data.training.jobId ?? "current";
+    if (streamFallbackJobId === jobId) return false;
+    if (trackingStream && trackingJobId === jobId) return true;
+    closeTrackingStream();
+    const source = new EventSource(data.trainingStream);
+    trackingStream = source;
+    trackingJobId = jobId;
+    const fallback = () => {
+      if (trackingStream !== source) return;
+      streamFallbackJobId = jobId;
+      closeTrackingStream();
+      clearTimeout(timer);
+      timer = setTimeout(refresh, POLL_INTERVAL_MS);
+    };
+    source.addEventListener("training-progress", (event) => {
+      if (trackingStream !== source) return;
+      try {
+        const update = JSON.parse(event.data);
+        renderStatus({ ...lastSnapshot, training: update.training });
+        if (!["running", "clearing"].includes(update.training.status)) refresh();
+      } catch { fallback(); }
+    });
+    source.addEventListener("stream-renew", () => {
+      if (trackingStream !== source) return;
+      closeTrackingStream();
+      if (lastSnapshot && ["running", "clearing"].includes(lastSnapshot.training.status)) trackWithStream(lastSnapshot);
+    });
+    source.addEventListener("stream-failed", fallback);
+    source.onerror = fallback;
+    return true;
+  }
 
   async function request(method = "GET", options = null) {
     const params = options ? new URLSearchParams({
-      learningRate: String(options.learningRate), epochs: String(options.epochs),
+      learningRate: String(options.learningRate), epochs: String(options.epochs), ...(typeof options.batchSize == 'undefined' ? {} : { batchSize: String(options.batchSize) }),
       compareLearningRates: String(options.compareLearningRates),
     }) : null;
     const path = method === "POST" ? `${useTrainEndpoint ? "/api/train" : "/api/training"}?${params}` : method === "DELETE" && useTrainEndpoint ? "/api/train" : "/api/training";
@@ -37,10 +83,12 @@
     return data;
   }
   function setFormBusy(busy) {
-    for (const control of [learningRateInput, epochsInput, compare, submit, closeDialog, cancel]) { if (control) control.disabled = busy; }
+    for (const control of [learningRateInput, epochsInput, batchSizeInput, compare, submit, closeDialog, cancel]) { if (control) control.disabled = busy; }
     submit.textContent = busy ? "Starting…" : "Start training";
   }
   function renderStatus(data) {
+    lastSnapshot = { ...lastSnapshot, ...data };
+    data = lastSnapshot;
     if (typeof data.trainingEndpoint != 'undefined' || typeof data.executor != 'undefined') {
       useTrainEndpoint = data.trainingEndpoint === "/api/train" || data.executor === "external";
     }
@@ -50,7 +98,8 @@
       : training.status === "failed" ? "Training did not complete" : "Model training required";
     progress.hidden = training.status !== "running";
     if (training.totalEpochs && training.iteration && training.iterationCount && typeof training.epoch != 'undefined') {
-      const completedEpochs = (training.iteration - FIRST_ITERATION) * training.totalEpochs + training.epoch;
+      const batchFraction = training.totalBatches ? (training.batch ?? 0) / training.totalBatches : 0;
+      const completedEpochs = (training.iteration - FIRST_ITERATION) * training.totalEpochs + training.epoch + batchFraction;
       progress.value = Math.min(PROGRESS_PERCENT_MAX, completedEpochs / (training.totalEpochs * training.iterationCount) * PROGRESS_PERCENT_MAX);
     } else { progress.removeAttribute("value"); }
     start.disabled = requesting || running;
@@ -58,8 +107,12 @@
     setFormBusy(requesting || running);
     start.textContent = training.status === "running" ? "Training…" : "Train model";
     if (banner) banner.hidden = data.modelReady && !running && training.status !== "failed";
-    message.textContent = running || training.status === "failed" ? training.message
+    message.textContent = running || training.status === "failed" ? window.i18n.t(training.message)
       : data.modelReady ? "A trained model is available." : "Model training required.";
+    if (running && typeof training.tensorBytes === "number") {
+      const memory = (training.tensorBytes / BYTES_PER_MIB).toLocaleString(window.i18n.locale, { maximumFractionDigits: MEMORY_PRECISION });
+      message.textContent += ` · ${window.i18n.t("Tensor memory: {memory} MiB", { memory })}`;
+    }
     document.dispatchEvent(new CustomEvent("training-model-status", { detail: data }));
     const statusKey = `${training.status}:${training.finishedAt}`;
     if (lastStatus !== null && lastStatus !== statusKey && !running) {
@@ -67,7 +120,8 @@
     }
     lastStatus = statusKey;
     clearTimeout(timer);
-    timer = running ? setTimeout(refresh, POLL_INTERVAL_MS) : null;
+    if (!running) closeTrackingStream();
+    timer = running && !trackWithStream(data) ? setTimeout(refresh, POLL_INTERVAL_MS) : null;
   }
   async function refresh() {
     if (refreshPromise) return refreshPromise;
@@ -92,6 +146,7 @@
     start.disabled = true;
     if (clear) clear.disabled = true;
     setFormBusy(true);
+    closeTrackingStream();
     await refreshPromise;
     clearTimeout(timer);
     message.textContent = method === "DELETE" ? "Deleting training data…" : "Starting training…";
@@ -129,18 +184,20 @@
     if (requesting || start.disabled || !form.reportValidity()) return;
     const learningRate = Number(learningRateInput.value);
     const epochs = Number(epochsInput.value);
+    const batchSize = batchSizeInput ? Number(batchSizeInput.value) : undefined;
     if (!Number.isFinite(learningRate) || learningRate <= 0 || !Number.isInteger(epochs) || epochs <= 0) {
       formError.textContent = "Enter a positive learning rate and a positive integer for iterations.";
       formError.hidden = false;
       return;
     }
     formError.hidden = true;
-    await mutate("POST", { learningRate, epochs, compareLearningRates: compare.checked });
+    await mutate("POST", { learningRate, epochs, batchSize, compareLearningRates: compare.checked });
   });
   for (const button of [closeDialog, cancel]) button.addEventListener("click", () => { if (!requesting) dialog.close(); });
   dialog.addEventListener("cancel", (event) => { if (requesting) event.preventDefault(); });
   clear?.addEventListener("click", () => mutate("DELETE"));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+  window.addEventListener("pagehide", closeTrackingStream);
   window.addEventListener("pageshow", refresh);
   window.addEventListener("focus", refresh);
   document.addEventListener("locale-changed", refresh);

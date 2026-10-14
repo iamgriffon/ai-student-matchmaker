@@ -37,7 +37,7 @@ function renderTraining() {
   const report = row.trainingReport;
   const facts = [
     ["Architecture", row.architecture.join(" → ")], ["Learning rate", metric(metadata.learningRate)],
-    ["Iterations", metadata.epochs], ["Training pairs", metadata.trainingCount], ["Validation pairs", metadata.validationCount],
+    ["Iterations", metadata.epochs], ["Batch size", report?.batchSize ?? "Not recorded"], ["Training pairs", metadata.trainingCount], ["Validation pairs", metadata.validationCount],
     ["Validation MAE", metric(metadata.validationMeanAbsoluteError)], ["Eligible-pair validation MAE", metric(metadata.eligibleValidationMeanAbsoluteError)],
     ["Validation strategy", strategyName(metadata.validationStrategy)], ["Training students", report?.trainingStudents ?? "Not recorded"],
     ["Validation students", report?.validationStudents ?? "Not recorded"], ["Excluded cross-group pairs", report?.excludedCrossGroupPairs ?? "Not recorded"],

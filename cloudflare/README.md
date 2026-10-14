@@ -121,3 +121,13 @@ Add an Allow policy containing only authorized administrators. Visiting `/traini
 `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are public application identifiers persisted in `wrangler.jsonc`, not login tokens.
 
 Reference: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
+
+## Bounded batches and progress streaming
+
+`batchSize` defaults to 64 pairs and is limited to 256. Configure it in the training modal, pass `batchSize` in `/api/train` query parameters, or use `--batch-size` with the manual CLI. The shared engine uses `trainOnBatch`, releases input/target tensors in a `finally` block and retains the same model/Adam state throughout training. Validation accumulates absolute error per batch instead of retaining all predictions. Vector reads and pair metadata lookups are bounded to the selected samples and per-request batch limits; the sampled JavaScript dataset still remains in memory (at most 3,000 training / 1,000 validation pairs in the Workflow).
+
+The API advertises `GET /api/training/events`. It returns SSE through a `ReadableStream` with backpressure, status-change events and heartbeats. The frontend renews tracking connections, refreshes model/history state on completion and falls back to polling on connection errors. Tracking only observes the existing job: reconnecting or closing the page neither starts nor cancels training. No history/event queue is retained in the stream.
+
+Batch progress is stored in `TrainingJob.options.batchProgress`, avoiding a schema migration. Writes occur on the first/last batch and every ten batches; every iteration's aggregate loss remains in the training report. `tensorBytes` measures live TensorFlow tensor allocations, not total process RAM or peak intermediate allocations.
+
+Batching bounds tensor memory and enables finer tracking. `tf.nextFrame` yields between batches for responsiveness; it does not renew the Worker CPU allowance. The Workflow still trains each model in one step, without weight/optimizer checkpoints between steps; the Free CPU limit may still interrupt it. CPU-limit failures are now reported explicitly in progress.

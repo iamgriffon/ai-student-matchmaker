@@ -21,11 +21,11 @@ const LOSS_DISPLAY_DIGITS = 6;
 const PACKAGE_ROOT = fileURLToPath(new URL("../", import.meta.url));
 const { values } = parseArgs({ args: process.argv.slice(2), options: {
   "job-id": { type: "string" },
-  "learning-rate": { type: "string" }, epochs: { type: "string" },
+  "learning-rate": { type: "string" }, "batch-size": { type: "string" }, epochs: { type: "string" },
   "compare-learning-rates": { type: "boolean", default: false },
   local: { type: "boolean", default: false },
 } });
-const options = trainingOptionsSchema.parse({ learningRate: values["learning-rate"], epochs: values.epochs, compareLearningRates: values["compare-learning-rates"] });
+const options = trainingOptionsSchema.parse({ learningRate: values["learning-rate"], epochs: values.epochs, batchSize: values["batch-size"], compareLearningRates: values["compare-learning-rates"] });
 const target = values.local ? "--local" : "--remote";
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
 let jobId: string | undefined;
@@ -104,7 +104,7 @@ try {
     const iteration = index + FIRST_ITERATION;
     const lossHistory: { epoch: number; loss: number }[] = [];
     const trained = await trainPairRanker(training, context.contextVersion, {
-      learningRate, epochs: options.epochs, validationSamples: validation,
+      learningRate, epochs: options.epochs, batchSize: options.batchSize, validationSamples: validation,
       onEpoch: async (epoch, loss) => {
         if (interrupted) throw new Error("External training interrupted.");
         const displayed = epoch + FIRST_ITERATION;
@@ -126,7 +126,7 @@ try {
     const payload = parseModelPayload(iteration.artifact, {
       modelId: metadata.modelId, labelSource: metadata.labelSource, validationStrategy: "student-disjoint",
       architecture: [PAIR_RANKER_INPUT_COUNT, ...iteration.artifact.modelTopology.config.layers.map((layer) => layer.config.units)],
-      epochs: metadata.epochs, trainingStudents: ids.trainingIds.size, validationStudents: ids.validationIds.size,
+      epochs: metadata.epochs, batchSize: options.batchSize, trainingStudents: ids.trainingIds.size, validationStudents: ids.validationIds.size,
       trainingPairs: training.length, validationPairs: validation.length, excludedCrossGroupPairs: split.excludedCount,
       comparisons, lossHistory: iteration.lossHistory,
     });
