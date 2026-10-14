@@ -47,7 +47,6 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url), path = url.pathname;
     if (!path.startsWith("/api/")) {
-      if (path === "/training") { const assetUrl = new URL("/training.html", request.url); return env.ASSETS.fetch(new Request(assetUrl, request)); }
       return env.ASSETS.fetch(request);
     }
     const db = database(env);
