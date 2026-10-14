@@ -6,11 +6,13 @@ import { evaluatePair, readPairFeatures } from "../../src/pairPolicy.ts";
 import { prepareTrainingBackend, trainPairRanker, serializeRanker, type RankerArtifact } from "../../src/rankerEngine.ts";
 import { parseModelPayload } from "../../db/validators/trainedModels.ts";
 import { PAIR_RANKER_INPUT_COUNT } from "../../src/modelConfig.ts";
-import { database, APP_STATE_ID, ACTIVE_MODEL_KIND, VECTOR_BATCH_SIZE, HttpError } from "./database.ts";
+import { database, APP_STATE_ID, ACTIVE_MODEL_KIND, HttpError } from "./database.ts";
 import { cohort, pairFeatures, savePairFeatures, synchronizeStudentVectors, type Cohort } from "./vectors.ts";
 import { isCompatible, modelPayload } from "./models.ts";
 import { decodePairVectorizeValues } from "./vectorizeEncoding.ts";
 
+// Vectorize getByIds accepts at most 20 IDs, independently of D1 write batches.
+const VECTORIZE_READ_BATCH_SIZE = 20;
 const ANCHORS_PER_GROUP = 2;
 const MIN_PARTITION_PAIRS = 200;
 const COMPARISON_LEARNING_RATE = 0.01;
@@ -47,8 +49,8 @@ async function samplesForTraining(env: Env, context: Cohort) {
   const db = database(env);
   const rows = await db.pairVector.findMany({ where: { contextVersion: context.contextVersion, generation: context.generation } });
   const persisted = new Map<string, readonly number[]>();
-  for (let offset = 0; offset < rows.length; offset += VECTOR_BATCH_SIZE) {
-    const batch = rows.slice(offset, offset + VECTOR_BATCH_SIZE);
+  for (let offset = 0; offset < rows.length; offset += VECTORIZE_READ_BATCH_SIZE) {
+    const batch = rows.slice(offset, offset + VECTORIZE_READ_BATCH_SIZE);
     const vectors = await env.PAIR_INDEX.getByIds(batch.map((row) => row.vectorId));
     const byId = new Map(vectors.map((vector) => [vector.id, vector.values]));
     for (const row of batch) {
