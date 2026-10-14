@@ -8,7 +8,7 @@ This directory is the Cloudflare implementation on the `cloudflare` branch. On t
 - **Prisma ORM 7 + `@prisma/adapter-d1`**: relational data in D1. The experimental Prisma 8 PostgreSQL contract is not a D1 adapter; this target has its own SQLite schema and generated client.
 - **Vectorize**: student vectors with three features and pair vectors with four features, stored in separate 32-dimensional Euclidean indexes. Extra coordinates are zero padding, preserving distances and the ranker’s four inputs. D1 stores vector IDs and cohort context, not JSON arrays of vectors.
 - **D1 JSON**: model artifacts and reports, validated with the existing Zod schemas. SQLite stores JSON rather than PostgreSQL `jsonb`.
-- **Workflows**: asynchronous TensorFlow.js training with a CPU backend, durable progress and one active operation enforced by a D1 unique constraint. The default remains one ranker, learning rate `0.001`, 80 iterations, with optional comparison.
+- **External training**: Bun runs TensorFlow.js with a CPU backend and uploads models/reports through Wrangler. D1 tracks progress and enforces one active operation. Defaults remain one ranker, learning rate `0.001`, 80 iterations, with optional comparison. The legacy Workflow implementation is retained but the production training endpoint does not start it.
 - **Shared engine**: normalization, eligibility, validation schemas and model training preserve the original semantics. The Postgres cache adapter remains separate.
 
 Vectorize mutations are eventually consistent. Recommendation eligibility and final model ranking use the full current cohort, so an indexing delay cannot remove a valid recommendation. Versioned vector IDs, cohort namespaces, generation changes and a D1 deletion outbox prevent stale writes or delayed deletions from making old vectors current. Vectorize similarity is a candidate ordering hint; it does not replace academic balance or the learned ranking.
@@ -55,6 +55,25 @@ bun run deploy
 `build` generates the Prisma client and performs a Wrangler dry run; `deploy` publishes the Worker. Workers have no persistent `bun start` process. After deployment, Cloudflare runs the exported fetch handler and the workflow.
 
 No Postgres reset or data migration is implicit. The seed is idempotent and inserts the existing synthetic CSV dataset. It does not overwrite students or import previous model/history records. For a data migration, export those records explicitly, validate artifacts with Zod and load them into D1 before selecting an active model.
+
+## External training on Workers Free
+
+The production API no longer starts TensorFlow Workflows. The training form displays a local command, while the UI still polls D1 for progress, model readiness and reports. TensorFlow fitting and Zod validation of full weights run in Bun. Wrangler reads the D1 snapshot and uploads validated model/report JSON directly, avoiding the Worker CPU budget. The script needs the same Cloudflare account access used for migrations; it works from a local machine or a service with Bun, Node and authenticated Wrangler.
+
+From the repository root:
+
+```bash
+bun install --frozen-lockfile
+bun install --cwd cloudflare --frozen-lockfile
+bun run cloudflare:migrate:remote
+bun run train:cloudflare --learning-rate 0.001 --epochs 80
+```
+
+Add `--compare-learning-rates` for the optional comparison, or `--local` to use local D1 instead of production. The default writes to **production D1**. No PostgreSQL connection is used. Training pairs are generated locally from the current student snapshot; Vectorize is not queried during fitting. Student and pair indexes continue to be maintained by the recommendation flow.
+
+`0003_external_training.sql` installs an atomic completion trigger. It checks the captured revision/generation, selected model version and validation thresholds before replacing the active model. Rejected reports remain available; the previous model stays active. Progress is uploaded every ten iterations and at the first/final iteration; reports retain every loss value. Interrupted processes release the lock when possible; the API expires a missing heartbeat after 15 minutes.
+
+This removes training CPU usage from Workers. Recommendation inference still runs on the Worker and must be measured separately against the Free limit; external training does not guarantee inference fits.
 
 ## Operational behavior
 

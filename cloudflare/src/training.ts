@@ -2,6 +2,8 @@ import { trainingOptionsSchema } from "../../src/trainingOptions.ts";
 import { database, HttpError, ACTIVE_OPERATION_KEY, APP_STATE_ID, flushVectorDeletions } from "./database.ts";
 import type { TrainingJob } from "./generated/prisma/client.ts";
 
+const EXTERNAL_HEARTBEAT_TIMEOUT_MS = 15 * 60_000;
+
 export type TrainingOptions = ReturnType<typeof trainingOptionsSchema.parse>;
 export function trainingStatus(job: TrainingJob | null) {
   return job ? { status: job.status, message: job.message, startedAt: job.startedAt, finishedAt: job.finishedAt,
@@ -11,7 +13,15 @@ export function trainingStatus(job: TrainingJob | null) {
 export async function latestTraining(env: Env) {
   const db = database(env);
   let job = await db.trainingJob.findFirst({ orderBy: { startedAt: "desc" } });
-  if (job?.status === "running") {
+  const externallyTrained = job?.options && typeof job.options === "object" && !Array.isArray(job.options) && job.options.executor === "external";
+  if (job?.status === "running" && externallyTrained) {
+    // A crashed external process cannot hold the training lock forever.
+    await env.DB.prepare(`UPDATE TrainingJob SET status = 'failed', activeKey = NULL, message = ?, finishedAt = ?
+      WHERE id = ? AND status = 'running' AND coalesce(json_extract(options, '$.lastHeartbeat'), 0) < ?`)
+      .bind("External training stopped reporting progress. Run the local command again.", new Date().toISOString(), job.id, Date.now() - EXTERNAL_HEARTBEAT_TIMEOUT_MS).run();
+    job = await db.trainingJob.findUnique({ where: { id: job.id } });
+  }
+  if (job?.status === "running" && !externallyTrained) {
     const instance = await env.TRAINING.get(job.id);
     const status = await instance.status();
     if (["errored", "terminated"].includes(status.status)) {

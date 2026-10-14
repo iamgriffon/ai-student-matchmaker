@@ -37,7 +37,8 @@
     "cloudflare:migrate:remote": "bun run --cwd cloudflare db:migrate:remote",
     "build:node": "tsdown",
     "deploy:node": "bun run build:node && bun run composer:deploy",
-    "dev:node": "bun --watch scripts/dev.ts"
+    "dev:node": "bun --watch scripts/dev.ts",
+    "train:cloudflare": "bun run cloudflare/scripts/trainExternal.ts"
   },
   "dependencies": {
     "@prisma/composer": "0.28.0",

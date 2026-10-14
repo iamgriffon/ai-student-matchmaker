@@ -1,14 +1,9 @@
 import { z } from "zod";
-import { createContextVersion } from "../../src/utils/contextVersion.ts";
-import { parseIncome } from "../../src/utils/incomeParser.ts";
-import { PAIR_ENCODER_VERSION } from "../../src/vectorSchema.ts";
-import { readPairFeatures } from "../../src/pairPolicy.ts";
 import { database, HttpError, APP_STATE_ID, VECTOR_BATCH_SIZE, type Database } from "./database.ts";
 import { encodeVectorizeValues } from "./vectorizeEncoding.ts";
-import type { User } from "./generated/prisma/client.ts";
+import { contextFromUsers, type Cohort } from "./cohortEncoding.ts";
+export { contextFromUsers, pairFeatures, type Cohort } from "./cohortEncoding.ts";
 
-const MAX_EXAM_SCORE = 100;
-const PAIR_MEMBER_COUNT = 2;
 const CONTEXT_ATTEMPTS = 3;
 export function parseUserId(value: string) { return z.uuid().parse(value.trim()).toLowerCase(); }
 export function orderedMembers(a: string, b: string) {
@@ -25,29 +20,6 @@ export async function cohort(db: Database) {
     return contextFromUsers(users, after.revision, after.vectorGeneration);
   }
   throw new HttpError(409, "The cohort changed. Please try again.");
-}
-export function contextFromUsers(users: User[], revision: number, generation: number) {
-  const prepared = users.map((user) => ({ ...user, parsedIncome: parseIncome(user.income) })).sort((a, b) => a.id.localeCompare(b.id));
-  const logs = prepared.map((user) => Math.log1p(user.parsedIncome));
-  const minLogIncome = logs.length ? Math.min(...logs) : 0;
-  const maxLogIncome = logs.length ? Math.max(...logs) : 0;
-  const incomeScale = { minLogIncome, maxLogIncome };
-  const students = prepared.map((user) => ({ userId: user.id, features: {
-    score: user.score / MAX_EXAM_SCORE,
-    income: maxLogIncome === minLogIncome ? 0 : (Math.log1p(user.parsedIncome) - minLogIncome) / (maxLogIncome - minLogIncome),
-    disability: user.disability ? 1 : 0,
-  } }));
-  const cohortMeanScore = students.length ? students.reduce((sum, student) => sum + student.features.score, 0) / students.length : 0;
-  const contextVersion = createContextVersion({ encoderVersion: PAIR_ENCODER_VERSION, students, cohortMeanScore, incomeScale });
-  return { users, students, revision, generation, contextVersion, cohortMeanScore };
-}
-export type Cohort = ReturnType<typeof contextFromUsers>;
-export function pairFeatures(a: Cohort["students"][number], b: Cohort["students"][number], mean: number) {
-  return readPairFeatures([
-    Math.abs((a.features.score + b.features.score) / PAIR_MEMBER_COUNT - mean),
-    Math.abs(a.features.score - b.features.score), Math.abs(a.features.income - b.features.income),
-    Math.abs(a.features.disability - b.features.disability),
-  ]);
 }
 export function pairNamespace(context: Cohort) { return `p-${context.generation}-${context.contextVersion.slice(0, 48)}`; }
 

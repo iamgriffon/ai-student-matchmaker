@@ -1,12 +1,11 @@
 import { z, ZodError } from "zod";
 import { userCreationSchema } from "../../db/validators/schema.ts";
-import { trainingOptionsSchema } from "../../src/trainingOptions.ts";
 import { database, flushVectorDeletions, HttpError } from "./database.ts";
 import { activeModel, trainingIteration } from "./models.ts";
 import { parseUserId, cohort, synchronizeStudentVectors } from "./vectors.ts";
 import { recommendPartners } from "./matchmaking.ts";
 import { startPairOutcome, completePairOutcome, listPairOutcomes } from "./pairOutcomes.ts";
-import { startTraining, clearTrainingData, latestTraining } from "./training.ts";
+import { clearTrainingData, latestTraining } from "./training.ts";
 export { TrainingWorkflow } from "./trainingWorkflow.ts";
 
 const MAX_REQUEST_BYTES = 16_384;
@@ -90,12 +89,10 @@ export default {
         if (request.method === "GET") {
           const [model, training] = await Promise.all([activeModel(db), latestTraining(env)]);
           cleanupVectors(env, ctx);
-          return json(HTTP.ok, { training, modelReady: model !== null, modelId: model?.modelId ?? null });
+          return json(HTTP.ok, { training, executor: "external", modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
-          const compareLearningRates = z.enum(["true", "false"]).default("false").parse(url.searchParams.get("compareLearningRates") ?? undefined) === "true";
-          const options = trainingOptionsSchema.parse({ compareLearningRates, learningRate: url.searchParams.get("learningRate") ?? undefined, epochs: url.searchParams.get("epochs") ?? undefined });
-          return json(HTTP.accepted, { training: await startTraining(env, options) });
+          throw new HttpError(HTTP.conflict, "Training runs outside Cloudflare. Run bun run train:cloudflare in your local project.");
         }
         if (request.method === "DELETE") return json(HTTP.ok, await clearTrainingData(env));
         return methodError("GET, POST, DELETE");

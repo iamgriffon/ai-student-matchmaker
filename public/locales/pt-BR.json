@@ -218,5 +218,7 @@
   "Enter a valid email address": "Informe um e-mail válido",
   "Income is required": "A renda é obrigatória",
   "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.": "A API retornou uma resposta vazia ou inválida (HTTP {status}). Verifique o deploy do Worker.",
-  "Could not load model status": "Não foi possível carregar o estado do modelo"
+  "Could not load model status": "Não foi possível carregar o estado do modelo",
+  "Show local command": "Mostrar comando local",
+  "Run this command in your local project:": "Execute este comando no projeto local:"
 }
