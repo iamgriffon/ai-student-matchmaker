@@ -174,9 +174,9 @@
   "Language": "Language",
   "English": "English",
   "Portuguese": "Portuguese",
-  "Disabled": "Disabled",
-  "Score {score} · {age} years · Disabled": "Score {score} · {age} years · Disabled",
-  "Score {score} · {income} · Disabled": "Score {score} · {income} · Disabled",
+  "Has disability": "Has disability",
+  "Score {score} · {age} years · Has disability": "Score {score} · {age} years · Has disability",
+  "Score {score} · {income} · Has disability": "Score {score} · {income} · Has disability",
   "Request body exceeds the allowed size.": "Request body exceeds the allowed size.",
   "Send valid JSON.": "Send valid JSON.",
   "Use GET to list training runs.": "Use GET to list training runs.",
@@ -227,5 +227,6 @@
   "Tensor memory: {memory} MiB": "Tensor memory: {memory} MiB",
   "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}",
   "Training exceeded the Worker CPU limit.": "Training exceeded the Worker CPU limit.",
-  "Training in your browser. Keep this page open.": "Training in your browser. Keep this page open."
+  "Training in your browser. Keep this page open.": "Training in your browser. Keep this page open.",
+  "Sociodiversity index": "Sociodiversity index"
 }

@@ -204,6 +204,23 @@ describe("recommendation frontend", () => {
 });
 
 describe("trained recommendations display", () => {
+  test("shows only the sociodiversity label and value", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json(RESULT));
+    await app.generateRecommendations();
+    const html = elements.get("recommendations")?.innerHTML;
+    expect(html).toContain("Sociodiversity index");
+    expect(html).toContain('data-i18n-skip>100</strong>');
+    expect(html).not.toContain("/ 100");
+    expect(html).not.toContain("<details>");
+    expect(html).not.toContain("<meter");
+  });
+  test("shows equal income as zero rather than hiding the indicator", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ ...RESULT, recommendations: [{
+      ...RESULT.recommendations[0], metrics: { ...RESULT.recommendations[0]!.metrics, incomeDistance: 0 },
+    }] }));
+    await app.generateRecommendations();
+    expect(elements.get("recommendations")?.innerHTML).toContain('data-i18n-skip>0</strong>');
+  });
   test("keeps technical model and cache details out of the recommendations", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({
       ...RESULT, rankingSource: "trained-policy-model", reusedCount: 1, calculatedCount: 0,

@@ -174,9 +174,9 @@
   "Language": "Idioma",
   "English": "Inglês",
   "Portuguese": "Português",
-  "Disabled": "PCD",
-  "Score {score} · {age} years · Disabled": "Nota {score} · {age} anos · PCD",
-  "Score {score} · {income} · Disabled": "Nota {score} · {income} · PCD",
+  "Has disability": "PCD",
+  "Score {score} · {age} years · Has disability": "Nota {score} · {age} anos · PCD",
+  "Score {score} · {income} · Has disability": "Nota {score} · {income} · PCD",
   "Request body exceeds the allowed size.": "Dados excedem o tamanho permitido.",
   "Send valid JSON.": "Envie dados em JSON válido.",
   "Use GET to list training runs.": "Use GET para consultar treinamentos.",
@@ -227,5 +227,6 @@
   "Tensor memory: {memory} MiB": "Memória dos tensores: {memory} MiB",
   "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Treinamento {iteration}/{iterationCount} · iteração {epoch}/{totalEpochs} · lote {batch}/{totalBatches}",
   "Training exceeded the Worker CPU limit.": "O treinamento excedeu o limite de CPU do Worker.",
-  "Training in your browser. Keep this page open.": "Treinando no seu navegador. Mantenha esta página aberta."
+  "Training in your browser. Keep this page open.": "Treinando no seu navegador. Mantenha esta página aberta.",
+  "Sociodiversity index": "Índice de sociodiversidade"
 }

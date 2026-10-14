@@ -207,3 +207,11 @@ small { display: block; margin-top: var(--space-xs); color: #7c8b84; font-weight
   .generate-actions > * { flex: 1 1 100%; }
   .form-row { gap: var(--space-md); }
 }
+
+.sociodiversity-index { grid-column: 2 / -1; grid-row: 2; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: #52675e; }
+.sociodiversity-index strong { color: #285b48; font-variant-numeric: tabular-nums; }
+.recommendation:has(.sociodiversity-index) > .start-pair { grid-row: 3; }
+@media (max-width: 700px) {
+  .sociodiversity-index { grid-row: 3; }
+  .recommendation:has(.sociodiversity-index) > .start-pair { grid-row: 4; }
+}
