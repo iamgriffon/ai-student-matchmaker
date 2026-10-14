@@ -20,6 +20,7 @@
   const banner = document.getElementById("model-required");
   const heading = document.getElementById("model-required-heading");
   const progress = document.getElementById("training-progress");
+  let canManageTraining = false;
   let browserTraining = null;
   let requesting = false;
   let refreshPromise = null;
@@ -143,6 +144,7 @@
     if (typeof data.trainingEndpoint != 'undefined' || typeof data.executor != 'undefined') {
       useTrainEndpoint = data.trainingEndpoint === "/api/train" || data.executor === "external";
     }
+    canManageTraining = data.canManageTraining === true;
     const training = data.training;
     const running = training.status === "running" || training.status === "clearing";
     if (heading) heading.textContent = training.status === "running" ? "Training in progress"
@@ -192,6 +194,7 @@
   }
   async function mutate(method, options = null) {
     if (requesting || start.disabled) return;
+    if (!canManageTraining) { window.location.assign("/api/train?login=true"); return; }
     if (method === "DELETE" && !window.confirm(window.i18n.t("Delete ALL pair vectors, models and training reports? Students and started study pairs will be preserved."))) return;
     requesting = true;
     start.disabled = true;
@@ -230,6 +233,7 @@
   }
   start.addEventListener("click", () => {
     if (start.disabled || requesting) return;
+    if (!canManageTraining) { window.location.assign("/api/train?login=true"); return; }
     formError.hidden = true;
     dialog.showModal();
   });

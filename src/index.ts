@@ -11,7 +11,7 @@ import { recommendPartners } from "./matchmaking.ts";
 import { startPairOutcome, completePairOutcome, listPairOutcomes } from "./pairOutcomes.ts";
 import { clearTrainingData, latestTraining } from "./training.ts";
 import { trainingStream } from "./trainingStream.ts";
-import { requireTrainingAuthorization } from "./trainingAuthorization.ts";
+import { canManageTraining, requireTrainingAuthorization } from "./trainingAuthorization.ts";
 
 const MAX_REQUEST_BYTES = 16_384;
 const MAX_MODEL_UPLOAD_BYTES = 262_144;
@@ -95,12 +95,15 @@ export default {
         if (request.method !== "GET") return methodError("GET");
         return trainingStream(request, env);
       }
+      if (path === "/api/train" && request.method === "GET" && url.searchParams.get("login") === "true") {
+        return new Response(null, { status: 303, headers: { location: "/training", "cache-control": "no-store" } });
+      }
       if (path === "/api/train" && !["POST", "DELETE"].includes(request.method)) return methodError("POST, DELETE");
       if (path === "/api/training" || path === "/api/train") {
         if (request.method === "GET") {
           const [model, training] = await Promise.all([activeModel(db), latestTraining(env)]);
           cleanupVectors(env, ctx);
-          return json(HTTP.ok, { training, executor: "browser", trainingEndpoint: "/api/train", trainingStream: "/api/training/events", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
+          return json(HTTP.ok, { training, executor: "browser", trainingEndpoint: "/api/train", trainingStream: "/api/training/events", trainingAuthRequired: true, canManageTraining: await canManageTraining(request, env), modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
           await requireTrainingAuthorization(request, env);

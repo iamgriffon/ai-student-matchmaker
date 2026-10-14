@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { HttpError } from "./database.ts";
 
-export type AccessEnv = { ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string; LOCAL_DEVELOPMENT?: string };
+export type AccessEnv = { ACCESS_TEAM_DOMAIN?: string; ACCESS_AUD?: string; LOCAL_DEVELOPMENT?: string; ADMIN_EMAIL?: string };
 const HTTP_FORBIDDEN = 403;
 const HTTP_UNAVAILABLE = 503;
 const ACCESS_COOKIE_PREFIX = "CF_Authorization=";
@@ -13,7 +13,21 @@ export async function requireTrainingAuthorization(request: Request, env: Access
     if (request.headers.get("origin") !== url.origin) throw new HttpError(HTTP_FORBIDDEN, "A same-origin browser request is required.");
     return;
   }
-  await verifyAccessIdentity(request, env);
+  if (request.headers.get("origin") !== url.origin) throw new HttpError(HTTP_FORBIDDEN, "A same-origin browser request is required.");
+  if (!await canManageTraining(request, env)) throw new HttpError(HTTP_FORBIDDEN, "Only the administrator signed in with Cloudflare Access can manage training.");
+}
+
+export async function canManageTraining(request: Request, env: AccessEnv): Promise<boolean> {
+  const hostname = new URL(request.url).hostname;
+  if (env.LOCAL_DEVELOPMENT === "true" && ["localhost", "127.0.0.1", "[::1]"].includes(hostname)) return true;
+  if (!env.ADMIN_EMAIL?.trim()) return false;
+  try {
+    const identity = await verifyAccessIdentity(request, env);
+    return typeof identity.email === "string"
+      && identity.email.trim().toLowerCase() === env.ADMIN_EMAIL.trim().toLowerCase();
+  } catch {
+    return false;
+  }
 }
 
 export async function verifyAccessIdentity(request: Request, env: AccessEnv) {

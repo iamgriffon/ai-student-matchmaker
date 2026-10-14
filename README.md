@@ -106,3 +106,14 @@ Recommendation TensorFlow inference also runs in a browser Web Worker.
 The server prepares eligible candidates and validates study-pair creation;
 the browser ranks candidates using the active artifact. Switching students
 terminates stale inference, and cached recommendations retain the existing behavior.
+
+### Public training history and administrator actions
+
+Keep `/training`, `/api/training` GET, and model history publicly readable.
+In the Cloudflare Access application, remove the `/training` destination and keep
+`/api/train` protected by the administrator email policy. Do not add a Bypass
+policy for the API. The application independently verifies Access JWTs and
+`ADMIN_EMAIL` for training mutations, including the legacy `/api/training` route.
+Unauthenticated action buttons navigate to `/api/train?login=true`; after Access
+login, that route redirects back to the public training page. The existing
+loopback-only local development training bypass is preserved.
