@@ -7,6 +7,7 @@ import { parseUserId, cohort, synchronizeStudentVectors } from "./vectors.ts";
 import { recommendPartners } from "./matchmaking.ts";
 import { startPairOutcome, completePairOutcome, listPairOutcomes } from "./pairOutcomes.ts";
 import { startTraining, clearTrainingData, latestTraining } from "./training.ts";
+import { requireTrainingAuthorization } from "./trainingAuthorization.ts";
 export { TrainingWorkflow } from "./trainingWorkflow.ts";
 
 const MAX_REQUEST_BYTES = 16_384;
@@ -85,13 +86,15 @@ export default {
         cleanupVectors(env, ctx);
         return json(HTTP.ok, result);
       }
-      if (path === "/api/training") {
+      if (path === "/api/train" && request.method !== "POST") return methodError("POST");
+      if (path === "/api/training" || path === "/api/train") {
         if (request.method === "GET") {
           const [model, training] = await Promise.all([activeModel(db), latestTraining(env)]);
           cleanupVectors(env, ctx);
-          return json(HTTP.ok, { training, executor: "external", modelReady: model !== null, modelId: model?.modelId ?? null });
+          return json(HTTP.ok, { training, executor: "external", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
+          requireTrainingAuthorization(request, env);
           const options = trainingOptionsSchema.parse({
             learningRate: url.searchParams.get("learningRate") ?? undefined,
             epochs: url.searchParams.get("epochs") ?? undefined,

@@ -8,6 +8,8 @@
   const dialog = document.getElementById("training-dialog");
   const form = document.getElementById("training-form");
   const learningRateInput = document.getElementById("training-learning-rate");
+  const accessKeyInput = document.getElementById("training-access-key");
+  const accessKeyField = document.getElementById("training-access-key-field");
   const epochsInput = document.getElementById("training-epochs");
   const formError = document.getElementById("training-form-error");
   const submit = document.getElementById("submit-training");
@@ -21,14 +23,17 @@
   let refreshPromise = null;
   let timer = null;
   let lastStatus = null;
+  let trainingAuthRequired = false;
 
   async function request(method = "GET", options = null) {
     const params = options ? new URLSearchParams({
       learningRate: String(options.learningRate), epochs: String(options.epochs),
       compareLearningRates: String(options.compareLearningRates),
     }) : null;
-    const path = method === "POST" ? `/api/training?${params}` : "/api/training";
-    const response = await fetch(path, { method });
+    const path = method === "POST" ? `${trainingAuthRequired ? "/api/train" : "/api/training"}?${params}` : "/api/training";
+    const headers = new Headers();
+    if (method === "POST" && trainingAuthRequired) headers.set("Authorization", `Bearer ${accessKeyInput?.value ?? ""}`);
+    const response = await fetch(path, { method, headers });
     const data = await response.json().catch(() => {
       throw new Error(window.i18n.t("The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.", { status: response.status }));
     });
@@ -36,10 +41,13 @@
     return data;
   }
   function setFormBusy(busy) {
-    for (const control of [learningRateInput, epochsInput, compare, submit, closeDialog, cancel]) control.disabled = busy;
+    for (const control of [learningRateInput, epochsInput, accessKeyInput, compare, submit, closeDialog, cancel]) { if (control) control.disabled = busy; }
     submit.textContent = busy ? "Starting…" : "Start training";
   }
   function renderStatus(data) {
+    if (typeof data.trainingAuthRequired != 'undefined') trainingAuthRequired = data.trainingAuthRequired === true;
+    if (accessKeyField) accessKeyField.hidden = !trainingAuthRequired;
+    if (accessKeyInput) accessKeyInput.required = trainingAuthRequired;
     const training = data.training;
     const running = training.status === "running" || training.status === "clearing";
     if (heading) heading.textContent = training.status === "running" ? "Training in progress"
@@ -134,6 +142,7 @@
     await mutate("POST", { learningRate, epochs, compareLearningRates: compare.checked });
   });
   for (const button of [closeDialog, cancel]) button.addEventListener("click", () => { if (!requesting) dialog.close(); });
+  dialog.addEventListener("close", () => { if (accessKeyInput) accessKeyInput.value = ""; });
   dialog.addEventListener("cancel", (event) => { if (requesting) event.preventDefault(); });
   clear?.addEventListener("click", () => mutate("DELETE"));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });

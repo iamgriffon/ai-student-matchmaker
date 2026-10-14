@@ -220,5 +220,7 @@
   "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.": "A API retornou uma resposta vazia ou inválida (HTTP {status}). Verifique o deploy do Worker.",
   "Could not load model status": "Não foi possível carregar o estado do modelo",
   "Show local command": "Mostrar comando local",
-  "Run this command in your local project:": "Execute este comando no projeto local:"
+  "Run this command in your local project:": "Execute este comando no projeto local:",
+  "Training access key": "Chave de acesso ao treinamento",
+  "Invalid training access key.": "Chave de acesso ao treinamento inválida."
 }

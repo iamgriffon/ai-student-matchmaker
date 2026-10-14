@@ -185,5 +185,7 @@
   "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.": "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.",
   "Could not load model status": "Could not load model status",
   "Show local command": "Show local command",
-  "Run this command in your local project:": "Run this command in your local project:"
+  "Run this command in your local project:": "Run this command in your local project:",
+  "Training access key": "Training access key",
+  "Invalid training access key.": "Invalid training access key."
 }

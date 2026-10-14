@@ -122,3 +122,11 @@ Configure `TRAINING_SERVICE_URL` on the Worker with the HTTPS base URL of this s
 Protocol: authenticated `POST /training` with `{ "jobId": "UUID", "options": { "learningRate": 0.001, "epochs": 80, "compareLearningRates": false } }`; respond HTTP 202 with the same job ID immediately. `GET /health` returns HTTP 200. Training uses a subprocess, so the HTTP response does not wait for fitting. D1 creates/locks the job before dispatch; the trainer claims that ID once, writes progress/models/reports and activates the model atomically. Duplicate starts cannot fit the same job twice.
 
 Deletion immediately clears the UI history, selection and count. Pending history requests are aborted and cannot restore deleted rows; physical Vectorize deletion continues through the durable outbox after the API response.
+
+## Authorizing training requests
+
+Start training with `POST /api/train?learningRate=0.001&epochs=80&compareLearningRates=false` and `Authorization: Bearer <training-access-key>`. `GET /api/train` never starts a run. The previous `POST /api/training` alias requires the same authorization.
+
+Store the administrator key as the Worker secret `TRAINING_ADMIN_TOKEN` (`bunx wrangler secret put TRAINING_ADMIN_TOKEN` from `cloudflare/`). Keep it separate from `TRAINING_SERVICE_TOKEN`, which authenticates the Worker to the Bun service. A missing admin secret returns HTTP 503; an invalid key returns HTTP 401 before creating a job or contacting the service.
+
+The modal asks for this key and sends it in the authorization header. It is never shipped in static files, included in query parameters, or stored in browser storage; closing the modal clears the input. An environment variable embedded in frontend JavaScript would be visible to every visitor and cannot provide authorization.

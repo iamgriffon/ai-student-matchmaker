@@ -47,6 +47,7 @@
           <label>Iterations<input id="training-epochs" name="epochs" type="number" min="1" step="1" value="80" required /></label>
         </div>
         <label class="checkbox"><input id="compare-learning-rates" name="compareLearningRates" type="checkbox" /> Also compare with learning rate 0.01</label>
+        <label id="training-access-key-field" hidden>Training access key<input id="training-access-key" type="password" autocomplete="off" spellcheck="false" /></label>
         <p id="training-form-error" class="form-error" role="alert" hidden></p>
         <div class="form-actions"><button type="button" id="cancel-training" class="secondary">Cancel</button><button id="submit-training" type="submit" class="primary">Start training</button></div>
       </form>
