@@ -75,7 +75,7 @@ References: [Prisma D1 integration](https://www.prisma.io/docs/guides/v7/deploym
 
 ## Cloudflare Workers Builds (Git integration)
 
-The production Worker name is **ai-student-matchmaker**, matching `https://ai-student-matchmaker.guusilveira.workers.dev/` and the `name` in `wrangler.jsonc`. D1 and Vectorize resource names remain `vestibulandos*`; they do not have to match the Worker name.
+The production Worker name is **vestibulandos**, matching `https://vestibulandos.guusilveira.workers.dev/` and the `name` in `wrangler.jsonc`. D1 and Vectorize resource names remain `vestibulandos*`; they do not have to match the Worker name.
 
 Select branch **cloudflare** and keep the repository root as the root directory. Configure:
 
