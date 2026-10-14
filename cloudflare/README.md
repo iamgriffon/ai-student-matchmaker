@@ -58,7 +58,7 @@ No Postgres reset or data migration is implicit. The seed is idempotent and inse
 
 ## External training on Workers Free
 
-The production API no longer starts TensorFlow Workflows. The training form displays a local command, while the UI still polls D1 for progress, model readiness and reports. TensorFlow fitting and Zod validation of full weights run in Bun. Wrangler reads the D1 snapshot and uploads validated model/report JSON directly, avoiding the Worker CPU budget. The script needs the same Cloudflare account access used for migrations; it works from a local machine or a service with Bun, Node and authenticated Wrangler.
+The production API no longer starts TensorFlow Workflows. The training form calls `POST /api/training`, which dispatches a job to the external Bun service. The UI polls D1 for progress, model readiness and reports. The CLI remains available for manual training. TensorFlow fitting and Zod validation of full weights run in Bun. Wrangler reads the D1 snapshot and uploads validated model/report JSON directly, avoiding the Worker CPU budget. The script needs the same Cloudflare account access used for migrations; it works from a local machine or a service with Bun, Node and authenticated Wrangler.
 
 From the repository root:
 
@@ -104,3 +104,21 @@ Select branch **cloudflare** and keep the repository root as the root directory.
 The root build installs `cloudflare/` dependencies, generates the Prisma D1 client and validates the Worker bundle with a dry run. The deploy command uses `cloudflare/wrangler.jsonc`. An assets-only deployment will serve the frontend but return empty 404 responses for `/api/*`; deploy the configured `src/index.ts` Worker together with its bindings. If the dashboard currently uses `npx wrangler deploy`, replace it with `bun run deploy` so Wrangler runs from the Cloudflare package.
 
 The old Node commands are explicit aliases: `bun run build:node`, `bun run dev:node` and `bun run deploy:node`. The `main` branch is not modified by this fix.
+
+## Hosted training service
+
+On the Bun server, install both packages and run:
+
+```bash
+bun install --frozen-lockfile
+bun install --cwd cloudflare --frozen-lockfile
+bun run training:serve
+```
+
+Configure `TRAINING_SERVICE_TOKEN` in the server's secret manager. Give the same secret to the Worker using `bunx wrangler secret put TRAINING_SERVICE_TOKEN` from `cloudflare/`; enter it through the interactive prompt, not source code or command arguments. The service also needs Wrangler authentication (`CLOUDFLARE_API_TOKEN` with D1 write access and `CLOUDFLARE_ACCOUNT_ID`, or an existing authenticated Wrangler profile). It defaults to port 3001 and listens on `0.0.0.0`; `PORT` and `TRAINING_HOST` can override these.
+
+Configure `TRAINING_SERVICE_URL` on the Worker with the HTTPS base URL of this service. It is kept as a Worker secret so deployments preserve it; use `bunx wrangler secret put TRAINING_SERVICE_URL` from `cloudflare/`. The service URL must reach the process running this repository's `training:serve`, not an unrelated Bun application.
+
+Protocol: authenticated `POST /training` with `{ "jobId": "UUID", "options": { "learningRate": 0.001, "epochs": 80, "compareLearningRates": false } }`; respond HTTP 202 with the same job ID immediately. `GET /health` returns HTTP 200. Training uses a subprocess, so the HTTP response does not wait for fitting. D1 creates/locks the job before dispatch; the trainer claims that ID once, writes progress/models/reports and activates the model atomically. Duplicate starts cannot fit the same job twice.
+
+Deletion immediately clears the UI history, selection and count. Pending history requests are aborted and cannot restore deleted rows; physical Vectorize deletion continues through the durable outbox after the API response.

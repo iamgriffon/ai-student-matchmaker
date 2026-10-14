@@ -21,7 +21,6 @@
   let refreshPromise = null;
   let timer = null;
   let lastStatus = null;
-  let trainingExecutor = "workflow";
 
   async function request(method = "GET", options = null) {
     const params = options ? new URLSearchParams({
@@ -38,10 +37,9 @@
   }
   function setFormBusy(busy) {
     for (const control of [learningRateInput, epochsInput, compare, submit, closeDialog, cancel]) control.disabled = busy;
-    submit.textContent = busy ? "Starting…" : trainingExecutor === "external" ? "Show local command" : "Start training";
+    submit.textContent = busy ? "Starting…" : "Start training";
   }
   function renderStatus(data) {
-    trainingExecutor = data.executor ?? "workflow";
     const training = data.training;
     const running = training.status === "running" || training.status === "clearing";
     if (heading) heading.textContent = training.status === "running" ? "Training in progress"
@@ -95,7 +93,11 @@
     message.textContent = method === "DELETE" ? "Deleting training data…" : "Starting training…";
     let operationError = null;
     try {
-      await request(method, options);
+      const result = await request(method, options);
+      if (method === "DELETE") {
+        document.dispatchEvent(new CustomEvent("training-data-cleared"));
+        renderStatus({ ...result, modelReady: false, modelId: null });
+      }
       if (method === "POST") dialog.close();
       document.dispatchEvent(new CustomEvent("training-data-changed"));
     } catch (error) { operationError = error.message; }
@@ -129,12 +131,6 @@
       return;
     }
     formError.hidden = true;
-    if (trainingExecutor === "external") {
-      const command = `bun run train:cloudflare --learning-rate ${learningRate} --epochs ${epochs}${compare.checked ? " --compare-learning-rates" : ""}`;
-      formError.textContent = `${window.i18n.t("Run this command in your local project:")} ${command}`;
-      formError.hidden = false;
-      return;
-    }
     await mutate("POST", { learningRate, epochs, compareLearningRates: compare.checked });
   });
   for (const button of [closeDialog, cancel]) button.addEventListener("click", () => { if (!requesting) dialog.close(); });

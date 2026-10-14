@@ -20,6 +20,7 @@ const COMPARISON_LEARNING_RATE = 0.01;
 const LOSS_DISPLAY_DIGITS = 6;
 const PACKAGE_ROOT = fileURLToPath(new URL("../", import.meta.url));
 const { values } = parseArgs({ args: process.argv.slice(2), options: {
+  "job-id": { type: "string" },
   "learning-rate": { type: "string" }, epochs: { type: "string" },
   "compare-learning-rates": { type: "boolean", default: false },
   local: { type: "boolean", default: false },
@@ -81,11 +82,20 @@ try {
   if (training.length < MIN_PARTITION_PAIRS || validation.length < MIN_PARTITION_PAIRS) throw new Error("Not enough pairs for student-disjoint validation.");
   console.log(`${ids.trainingIds.size} training students / ${ids.validationIds.size} validation students; ${training.length} training pairs / ${validation.length} validation pairs.`);
   const learningRates = options.compareLearningRates ? [...new Set([COMPARISON_LEARNING_RATE, options.learningRate])] : [options.learningRate];
-  const candidateJobId = crypto.randomUUID();
+  const requestedJobId = typeof values["job-id"] == 'undefined' ? undefined : z.uuid().parse(values["job-id"]);
+  const candidateJobId = requestedJobId ?? crypto.randomUUID();
   const startedAt = new Date().toISOString();
-  const created = await execute(`INSERT INTO TrainingJob (id, activeKey, status, message, options, revision, generation, totalEpochs, learningRate, iterationCount, startedAt)
+  // An endpoint-created job is claimed once; replaying its ID cannot start another trainer.
+  const created = typeof requestedJobId == 'undefined' ? await execute(`INSERT INTO TrainingJob (id, activeKey, status, message, options, revision, generation, totalEpochs, learningRate, iterationCount, startedAt)
     SELECT ${quote(candidateJobId)}, 'training', 'running', 'Training in Bun outside Cloudflare…', ${quote(JSON.stringify({ ...options, executor: "external", lastHeartbeat: Date.now() }))}, revision, vectorGeneration, ${options.epochs}, ${options.learningRate}, ${learningRates.length}, ${quote(startedAt)}
-    FROM AppState WHERE id = 'main' AND revision = ${context.revision} AND vectorGeneration = ${context.generation} RETURNING id;`);
+    FROM AppState WHERE id = 'main' AND revision = ${context.revision} AND vectorGeneration = ${context.generation} RETURNING id;`) : await execute(`
+    UPDATE TrainingJob SET iterationCount = ${learningRates.length}, options = json_set(options, '$.externalClaim', ${quote(crypto.randomUUID())}, '$.lastHeartbeat', ${Date.now()})
+    WHERE id = ${quote(requestedJobId)} AND status = 'running' AND activeKey = 'training'
+      AND revision = ${context.revision} AND generation = ${context.generation}
+      AND json_extract(options, '$.executor') = 'external' AND json_extract(options, '$.externalClaim') IS NULL
+      AND totalEpochs = ${options.epochs} AND learningRate = ${options.learningRate}
+      AND json_extract(options, '$.compareLearningRates') = ${options.compareLearningRates ? 1 : 0}
+    RETURNING id;`);
   if (!created.length) throw new Error("The cohort changed. Start again.");
   jobId = candidateJobId;
   await prepareTrainingBackend();

@@ -1,5 +1,5 @@
 import { trainingOptionsSchema } from "../../src/trainingOptions.ts";
-import { database, HttpError, ACTIVE_OPERATION_KEY, APP_STATE_ID, flushVectorDeletions } from "./database.ts";
+import { database, HttpError, ACTIVE_OPERATION_KEY, APP_STATE_ID } from "./database.ts";
 import type { TrainingJob } from "./generated/prisma/client.ts";
 
 const EXTERNAL_HEARTBEAT_TIMEOUT_MS = 15 * 60_000;
@@ -32,12 +32,12 @@ export async function latestTraining(env: Env) {
   }
   return trainingStatus(job);
 }
-async function createOperation(env: Env, status: string, message: string, options: TrainingOptions) {
+async function createOperation(env: Env, status: string, message: string, options: TrainingOptions, external = false) {
   const db = database(env);
   const state = await db.appState.findUniqueOrThrow({ where: { id: APP_STATE_ID } });
   try {
     return await db.trainingJob.create({ data: {
-      id: crypto.randomUUID(), activeKey: ACTIVE_OPERATION_KEY, status, message, options,
+      id: crypto.randomUUID(), activeKey: ACTIVE_OPERATION_KEY, status, message, options: external ? { ...options, executor: "external", lastHeartbeat: Date.now() } : options,
       revision: state.revision, generation: state.vectorGeneration, totalEpochs: options.epochs, learningRate: options.learningRate,
     } });
   } catch (error) {
@@ -45,17 +45,34 @@ async function createOperation(env: Env, status: string, message: string, option
     throw error;
   }
 }
-export async function startTraining(env: Env, input: unknown) {
+type ExternalTrainingEnv = Env & { TRAINING_SERVICE_URL?: string; TRAINING_SERVICE_TOKEN?: string };
+const SERVICE_START_TIMEOUT_MS = 10_000;
+export async function startTraining(env: ExternalTrainingEnv, input: unknown) {
   const options = trainingOptionsSchema.parse(input);
-  const job = await createOperation(env, "running", "Preparing pair vectors…", options);
-  try { await env.TRAINING.create({ id: job.id, params: { jobId: job.id } }); }
-  catch (error) {
-    await database(env).trainingJob.update({ where: { id: job.id }, data: {
-      activeKey: null, status: "failed", finishedAt: new Date(), message: "Could not start training.",
-    } });
-    throw error;
+  if (!env.TRAINING_SERVICE_URL || !env.TRAINING_SERVICE_TOKEN) {
+    throw new HttpError(503, "Configure the external training service URL and token before starting training.");
   }
-  return trainingStatus(job);
+  const endpoint = new URL("/training", env.TRAINING_SERVICE_URL);
+  if (endpoint.protocol !== "https:") throw new HttpError(503, "The training service must use an HTTPS URL.");
+  const job = await createOperation(env, "running", "Starting the external training service…", options, true);
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${env.TRAINING_SERVICE_TOKEN}` },
+      body: JSON.stringify({ jobId: job.id, options }), signal: AbortSignal.timeout(SERVICE_START_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new HttpError(502, "The external training service could not accept this run.");
+    const acknowledgment = await response.json();
+    if (!acknowledgment || typeof acknowledgment !== "object" || !("jobId" in acknowledgment) || acknowledgment.jobId !== job.id) {
+      throw new HttpError(502, "The external training service returned an invalid job acknowledgment.");
+    }
+    return trainingStatus(job);
+  } catch (error) {
+    await database(env).trainingJob.updateMany({ where: { id: job.id, status: "running" }, data: {
+      activeKey: null, status: "failed", finishedAt: new Date(), message: "Could not start the external training service.",
+    } });
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(502, "Could not reach the external training service.");
+  }
 }
 export async function clearTrainingData(env: Env) {
   const job = await createOperation(env, "clearing", "Deleting training data…", trainingOptionsSchema.parse({}));
@@ -69,8 +86,7 @@ export async function clearTrainingData(env: Env) {
       env.DB.prepare("UPDATE TrainingJob SET status = 'idle', message = ?, activeKey = NULL, finishedAt = ? WHERE id = ?")
         .bind("Training data deleted. Model training required.", now, job.id),
     ]);
-    // The generation change hides old vectors immediately. Failed physical deletions remain in the durable outbox.
-    await flushVectorDeletions(env).catch((error) => console.error(JSON.stringify({ event: "vector-deletion-pending", message: String(error) })));
+    // The generation change hides old vectors immediately. Physical deletion runs through the durable outbox.
     return { deleted: { pairVectors: result[0]?.meta.changes ?? 0, trainedModels: result[1]?.meta.changes ?? 0 }, training: await latestTraining(env) };
   } catch (error) {
     await database(env).trainingJob.update({ where: { id: job.id }, data: { activeKey: null, status: "failed", finishedAt: new Date(), message: "Could not delete training data." } });
