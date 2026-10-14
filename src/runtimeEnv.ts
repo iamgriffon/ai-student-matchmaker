@@ -10,5 +10,6 @@ export type RuntimeEnv = {
   TRAINING?: Env["TRAINING"];
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
+  ADMIN_EMAIL?: string;
   LOCAL_DEVELOPMENT?: string;
 };

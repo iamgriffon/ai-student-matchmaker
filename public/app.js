@@ -1,4 +1,5 @@
 const state = {
+  canDeleteStudents: false,
   users: [], selectedId: null, query: "", sortBy: "name-asc", busy: false, loading: true,
   recommendationResult: null, recommendationLoading: false, recommendationError: "",
   editingId: null, startedPairs: new Set(),
@@ -139,7 +140,7 @@ function renderSelection() {
     return;
   }
   elements["selected-student"].innerHTML = `
-    <div class="selected-header">${avatar(selected)}<div class="selected-copy"><h2 data-i18n-skip>${escapeHtml(nameOf(selected))}</h2><p class="email">${escapeHtml(selected.email)}</p></div><button class="delete-button" id="delete-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Delete student</button></div>
+    <div class="selected-header">${avatar(selected)}<div class="selected-copy"><h2 data-i18n-skip>${escapeHtml(nameOf(selected))}</h2><p class="email">${escapeHtml(selected.email)}</p></div>${state.canDeleteStudents ? `<button class="delete-button" id="delete-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Delete student</button>` : ""}</div>
     <div class="metrics"><div><span class="metric-label">Exam score</span><span class="metric-value">${escapeHtml(selected.score)} <small>/ 100</small></span></div><div><span class="metric-label">Monthly income</span><span class="metric-value">${escapeHtml(incomeOf(selected))}</span></div><div><span class="metric-label">Profile</span><span class="metric-value">${selected.disability ? "Has disability" : "No disability"}</span></div></div>
     <div class="generate-actions"><button class="secondary" id="edit-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Edit student</button><button class="primary" id="generate-recommendations" ${state.busy || state.loading || state.recommendationLoading || state.modelReady !== true || state.trainingBusy ? "disabled" : ""}>${state.recommendationLoading ? "Loading recommendations…" : recommendationCache.has(selected.id) ? "Refresh recommendations" : "Generate recommendations"}</button></div>`;
   if (state.recommendationLoading) {
@@ -193,6 +194,7 @@ async function requestUsers(path, options) {
   });
   if (!response.ok) throw new Error(data.error || data.message || "Could not complete the operation. Please try again.");
   if (!Array.isArray(data.users)) throw new Error("The server returned an invalid student list.");
+  if (typeof data.canDeleteStudents !== "undefined") state.canDeleteStudents = data.canDeleteStudents === true;
   return data.users;
 }
 
@@ -308,7 +310,7 @@ elements["selected-student"].addEventListener("click", async (event) => {
     await generateRecommendations();
     return;
   }
-  if (!event.target.closest("#delete-student") || state.busy || state.loading || state.recommendationLoading) return;
+  if (!state.canDeleteStudents || !event.target.closest("#delete-student") || state.busy || state.loading || state.recommendationLoading) return;
   const selected = state.users.find((user) => user.id === state.selectedId);
   if (!selected || !window.confirm(window.i18n.t(`Delete ${nameOf(selected)}? The student and their study pair records will be removed from the database.`))) return;
   state.busy = true;

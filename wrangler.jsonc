@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "ADMIN_EMAIL": "guusilveira@gmail.com",
     "ACCESS_TEAM_DOMAIN": "https://dupin-dev.cloudflareaccess.com",
     "ACCESS_AUD": "f1cc9070f6d5581a93d80c1e11d512518041fb8e6f543c81fe07c488cef7c351"
   },

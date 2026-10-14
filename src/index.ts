@@ -1,3 +1,4 @@
+import { canDeleteStudents, requireStudentDeletionAuthorization } from "./studentAuthorization.ts";
 import type { RuntimeEnv as Env } from "./runtimeEnv.ts";
 import { startBrowserTraining, updateBrowserTraining } from "./browserTraining.ts";
 import { z, ZodError } from "zod";
@@ -57,7 +58,7 @@ export default {
     const db = database(env);
     try {
       if (path === "/api/users") {
-        if (request.method === "GET") return json(HTTP.ok, { users: await db.user.findMany() });
+        if (request.method === "GET") return json(HTTP.ok, { users: await db.user.findMany(), canDeleteStudents: await canDeleteStudents(request, env) });
         if (request.method === "POST") {
           const input = userInputSchema.parse(await readJson(request));
           await db.user.create({ data: { id: crypto.randomUUID(), ...input } });
@@ -74,6 +75,7 @@ export default {
           const result = await db.user.updateMany({ where: { id }, data: input });
           if (!result.count) throw new HttpError(HTTP.notFound, "Student not found.");
         } else if (request.method === "DELETE") {
+          await requireStudentDeletionAuthorization(request, env);
           const result = await db.user.deleteMany({ where: { id } });
           if (!result.count) throw new HttpError(HTTP.notFound, "Student not found.");
         } else return methodError("PATCH, DELETE");
