@@ -27,7 +27,7 @@ export async function recommendPartners(env: Env, userId: string) {
       if (typeof partner == 'undefined') throw new Error("Partner not found in cohort.");
       return { userAId: id, userBId: student.userId, features,
         partner: { id: partner.id, name: partner.name, score: partner.score, income: partner.income, disability: partner.disability },
-        outcomeId: started.get(student.userId) ?? null, ...evaluatePair(features) };
+        outcomeId: started.get(student.userId) ?? null, ...evaluatePair(features, undefined, model.artifact.metadata.categoryWeights) };
     });
   const eligible = pairs.filter((pair) => pair.eligible);
   return {

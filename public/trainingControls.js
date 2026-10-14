@@ -6,6 +6,11 @@
   const MEMORY_PRECISION = 2;
   const start = document.getElementById("start-training");
   const clear = document.getElementById("clear-training-data");
+  const weightInputs = {
+    balance: document.getElementById("training-weight-balance"),
+    incomeDistance: document.getElementById("training-weight-income"),
+    disabilityDifference: document.getElementById("training-weight-disability"),
+  };
   const compare = document.getElementById("compare-learning-rates");
   const dialog = document.getElementById("training-dialog");
   const form = document.getElementById("training-form");
@@ -125,6 +130,7 @@
     const params = options ? new URLSearchParams({
       learningRate: String(options.learningRate), epochs: String(options.epochs), ...(typeof options.batchSize == 'undefined' ? {} : { batchSize: String(options.batchSize) }),
       compareLearningRates: String(options.compareLearningRates),
+      categoryWeights: JSON.stringify(options.categoryWeights),
     }) : null;
     const path = method === "POST" ? `${useTrainEndpoint ? "/api/train" : "/api/training"}?${params}` : method === "DELETE" && useTrainEndpoint ? "/api/train" : "/api/training";
     const response = await fetch(path, { method });
@@ -135,7 +141,7 @@
     return data;
   }
   function setFormBusy(busy) {
-    for (const control of [learningRateInput, epochsInput, batchSizeInput, compare, submit, closeDialog, cancel]) { if (control) control.disabled = busy; }
+    for (const control of [...Object.values(weightInputs), learningRateInput, epochsInput, batchSizeInput, compare, submit, closeDialog, cancel]) { if (control) control.disabled = busy; }
     submit.textContent = busy ? "Starting…" : "Start training";
   }
   function renderStatus(data) {
@@ -248,8 +254,15 @@
       formError.hidden = false;
       return;
     }
+    const categoryWeights = Object.fromEntries(Object.entries(weightInputs).map(([key, input]) => [key, Number(input.value)]));
+    const totalWeight = Object.values(categoryWeights).reduce((sum, weight) => sum + weight, 0);
+    if (!Object.values(categoryWeights).every((weight) => Number.isFinite(weight) && weight >= 0) || !Number.isFinite(totalWeight) || totalWeight <= 0) {
+      formError.textContent = window.i18n.t("At least one category weight must be positive.");
+      formError.hidden = false;
+      return;
+    }
     formError.hidden = true;
-    await mutate("POST", { learningRate, epochs, batchSize, compareLearningRates: compare.checked });
+    await mutate("POST", { learningRate, epochs, batchSize, categoryWeights, compareLearningRates: compare.checked });
   });
   for (const button of [closeDialog, cancel]) button.addEventListener("click", () => { if (!requesting) dialog.close(); });
   dialog.addEventListener("cancel", (event) => { if (requesting) event.preventDefault(); });
@@ -267,6 +280,7 @@
       navigator.sendBeacon("/api/train?action=update", new Blob([JSON.stringify({ jobId, action: "failed" })], { type: "application/json" }));
     }
   });
+  document.addEventListener("training-model-activated", refresh);
   window.addEventListener("pageshow", refresh);
   window.addEventListener("focus", refresh);
   document.addEventListener("locale-changed", refresh);

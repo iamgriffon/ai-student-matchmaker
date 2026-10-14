@@ -228,5 +228,17 @@
   "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Treinamento {iteration}/{iterationCount} · iteração {epoch}/{totalEpochs} · lote {batch}/{totalBatches}",
   "Training exceeded the Worker CPU limit.": "O treinamento excedeu o limite de CPU do Worker.",
   "Training in your browser. Keep this page open.": "Treinando no seu navegador. Mantenha esta página aberta.",
-  "Sociodiversity index": "Índice de sociodiversidade"
+  "Sociodiversity index": "Índice de sociodiversidade",
+  "Category weights": "Pesos das categorias",
+  "Relative weights are normalized automatically. Academic eligibility stays unchanged.": "Os pesos relativos são normalizados automaticamente. A elegibilidade acadêmica permanece igual.",
+  "Academic balance": "Equilíbrio acadêmico",
+  "Income diversity": "Diversidade de renda",
+  "Disability diversity": "Diversidade PCD",
+  "At least one category weight must be positive.": "Pelo menos um peso de categoria deve ser positivo.",
+  "Use as current model": "Usar como modelo atual",
+  "Activating…": "Ativando…",
+  "Model activated.": "Modelo ativado.",
+  "Could not activate model.": "Não foi possível ativar o modelo.",
+  "This model is incompatible with the current cohort or validation requirements.": "Este modelo é incompatível com a turma atual ou com os requisitos de validação.",
+  "The cohort changed or another training operation is running. Refresh and try again.": "A turma mudou ou outra operação de treinamento está em andamento. Atualize e tente novamente."
 }

@@ -1,3 +1,4 @@
+import { activatePreviousModel } from "./modelActivation.ts";
 import { canDeleteStudents, requireStudentDeletionAuthorization } from "./studentAuthorization.ts";
 import type { RuntimeEnv as Env } from "./runtimeEnv.ts";
 import { startBrowserTraining, updateBrowserTraining } from "./browserTraining.ts";
@@ -5,13 +6,13 @@ import { z, ZodError } from "zod";
 import { trainingOptionsSchema } from "./trainingOptions.ts";
 import { userCreationSchema } from "./validators/schema.ts";
 import { database, flushVectorDeletions, HttpError } from "./database.ts";
-import { activeModel, trainingIteration } from "./models.ts";
+import { activeModel, trainingIteration, isCompatible, modelPayload } from "./models.ts";
 import { parseUserId, cohort, synchronizeStudentVectors } from "./vectors.ts";
 import { recommendPartners } from "./matchmaking.ts";
 import { startPairOutcome, completePairOutcome, listPairOutcomes } from "./pairOutcomes.ts";
 import { clearTrainingData, latestTraining } from "./training.ts";
 import { trainingStream } from "./trainingStream.ts";
-import { canManageTraining, requireTrainingAuthorization } from "./trainingAuthorization.ts";
+import { canManageTraining, isLocalDevelopment, requireTrainingAuthorization } from "./trainingAuthorization.ts";
 
 const MAX_REQUEST_BYTES = 16_384;
 const MAX_MODEL_UPLOAD_BYTES = 262_144;
@@ -103,14 +104,23 @@ export default {
         if (request.method === "GET") {
           const [model, training] = await Promise.all([activeModel(db), latestTraining(env)]);
           cleanupVectors(env, ctx);
-          return json(HTTP.ok, { training, executor: "browser", trainingEndpoint: "/api/train", trainingStream: "/api/training/events", trainingAuthRequired: true, canManageTraining: await canManageTraining(request, env), modelReady: model !== null, modelId: model?.modelId ?? null });
+          return json(HTTP.ok, { training, executor: "browser", trainingEndpoint: "/api/train", trainingStream: "/api/training/events", trainingAuthRequired: !isLocalDevelopment(request, env), canManageTraining: await canManageTraining(request, env), modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
           await requireTrainingAuthorization(request, env);
+          if (url.searchParams.get("action") === "activate") {
+            return json(HTTP.ok, await activatePreviousModel(env, z.uuid().parse(url.searchParams.get("modelId"))));
+          }
           if (url.searchParams.get("action") === "update") {
             return json(HTTP.ok, await updateBrowserTraining(env, await readJson(request, MAX_MODEL_UPLOAD_BYTES)));
           }
+          let categoryWeights: unknown;
+          if (url.searchParams.has("categoryWeights")) {
+            try { categoryWeights = JSON.parse(url.searchParams.get("categoryWeights")!); }
+            catch { throw new HttpError(HTTP.badRequest, "Invalid category weights."); }
+          }
           const options = trainingOptionsSchema.parse({
+            categoryWeights,
             learningRate: url.searchParams.get("learningRate") ?? undefined,
             epochs: url.searchParams.get("epochs") ?? undefined,
             batchSize: url.searchParams.get("batchSize") ?? undefined,
@@ -134,7 +144,11 @@ export default {
       if (path === "/api/trained-models") {
         if (request.method !== "GET") return methodError("GET");
         const rows = await db.trainedModel.findMany({ orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: TRAINING_HISTORY_LIMIT });
-        return json(HTTP.ok, { iterations: rows.map(trainingIteration) });
+        const context = await cohort(db);
+        return json(HTTP.ok, { iterations: rows.map((row) => {
+          const artifact = modelPayload(row).artifact;
+          return { ...trainingIteration(row), canActivate: isCompatible(artifact) && artifact.metadata.validationStrategy === "student-disjoint" && artifact.metadata.sourceContextVersion === context.contextVersion };
+        }) });
       }
       const trainedModel = /^\/api\/trained-models\/([^/]+)$/.exec(path);
       if (trainedModel) {

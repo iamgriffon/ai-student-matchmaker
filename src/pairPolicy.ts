@@ -1,3 +1,4 @@
+import { DEFAULT_CATEGORY_WEIGHTS, type CategoryWeights } from "./categoryWeights.ts";
 export const PAIR_POLICY_VERSION = "pair-policy-v1";
 
 const PAIR_FEATURE_COUNT = 4;
@@ -5,11 +6,7 @@ const DEFAULT_MAX_IMBALANCE = 0.1;
 const FLOAT_COMPARISON_TOLERANCE = 1e-6;
 const MIN_NORMALIZED_VALUE = 0;
 const MAX_NORMALIZED_VALUE = 1;
-const PAIR_SCORE_WEIGHTS = {
-  balance: 0.7,
-  incomeDistance: 0.2,
-  disabilityDifference: 0.1,
-} as const;
+
 
 export type PairFeatures = readonly [
   imbalance: number,
@@ -38,6 +35,7 @@ export function readPairFeatures(values: readonly number[]): PairFeatures {
 export function evaluatePair(
   features: PairFeatures,
   maxImbalance = DEFAULT_MAX_IMBALANCE,
+  categoryWeights: CategoryWeights = DEFAULT_CATEGORY_WEIGHTS,
 ) {
   // Early throw para dados invalidos
   if (!Number.isFinite(maxImbalance) || maxImbalance <= MIN_NORMALIZED_VALUE) {
@@ -68,9 +66,9 @@ export function evaluatePair(
   // Pesos iniciais de uma política explícita.
   // Ainda não foram aprendidos nem validados com resultados reais.
   const score =
-    PAIR_SCORE_WEIGHTS.balance * balance +
-    PAIR_SCORE_WEIGHTS.incomeDistance * incomeDistance +
-    PAIR_SCORE_WEIGHTS.disabilityDifference * disabilityDifference;
+    categoryWeights.balance * balance +
+    categoryWeights.incomeDistance * incomeDistance +
+    categoryWeights.disabilityDifference * disabilityDifference;
 
   return {
     eligible,

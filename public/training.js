@@ -1,8 +1,9 @@
-const trainingState = { iterations: [], selectedId: null, loading: false };
+const trainingState = { iterations: [], selectedId: null, loading: false, activating: false, canManage: false, trainingBusy: false };
 let trainingLoadRevision = 0;
 let trainingLoadController = null;
 const trainingElements = Object.fromEntries(["training-list", "training-detail", "training-count", "training-notice", "reload-training"].map((id) => [id, document.getElementById(id)]));
 const METRIC_PRECISION = 6;
+const LEGACY_CATEGORY_WEIGHTS = { balance: 0.7, incomeDistance: 0.2, disabilityDifference: 0.1 };
 const PLOT_WIDTH = 600;
 const PLOT_HEIGHT = 220;
 const PLOT_PADDING = 36;
@@ -36,6 +37,9 @@ function renderTraining() {
   const metadata = row.metadata;
   const report = row.trainingReport;
   const facts = [
+    ["Academic balance", metric(metadata.categoryWeights?.balance ?? LEGACY_CATEGORY_WEIGHTS.balance)],
+    ["Income diversity", metric(metadata.categoryWeights?.incomeDistance ?? LEGACY_CATEGORY_WEIGHTS.incomeDistance)],
+    ["Disability diversity", metric(metadata.categoryWeights?.disabilityDifference ?? LEGACY_CATEGORY_WEIGHTS.disabilityDifference)],
     ["Architecture", row.architecture.join(" → ")], ["Learning rate", metric(metadata.learningRate)],
     ["Iterations", metadata.epochs], ["Batch size", report?.batchSize ?? "Not recorded"], ["Training pairs", metadata.trainingCount], ["Validation pairs", metadata.validationCount],
     ["Validation MAE", metric(metadata.validationMeanAbsoluteError)], ["Eligible-pair validation MAE", metric(metadata.eligibleValidationMeanAbsoluteError)],
@@ -44,8 +48,10 @@ function renderTraining() {
     ["Encoder", metadata.encoderVersion], ["Policy", metadata.policyVersion], ["Trained at", trainingDate(metadata.trainedAt)],
     ["Cohort context", metadata.sourceContextVersion], ["Run ID", row.id],
   ];
+  const activation = row.active ? '<span class="active-badge">Active model</span>'
+    : `<button class="secondary" id="activate-model" ${trainingState.activating || trainingState.trainingBusy || !row.canActivate ? "disabled" : ""}>${trainingState.activating ? "Activating…" : "Use as current model"}</button>${!row.canActivate ? '<p>This model is incompatible with the current cohort or validation requirements.</p>' : ""}`;
   const comparison = (report?.comparisons?.length ?? 0) >= MIN_COMPARISON_MODELS ? `<div class="table-scroll"><table class="training-table"><caption>Comparison within the same training round</caption><thead><tr><th>Learning rate</th><th>Validation MAE</th><th>Eligible-pair MAE</th></tr></thead><tbody>${report.comparisons.map((candidate) => `<tr><td>${metric(candidate.learningRate)}</td><td>${metric(candidate.validationMeanAbsoluteError)}</td><td>${metric(candidate.eligibleValidationMeanAbsoluteError)}</td></tr>`).join("")}</tbody></table></div>` : '<p class="empty">No comparison report.</p>';
-  trainingElements["training-detail"].innerHTML = `<div class="section-heading"><h2 id="training-detail-heading">${trainingEscape(row.modelId)}</h2>${row.active ? '<span class="active-badge">Active model</span>' : ""}</div><dl class="training-facts">${facts.map(([label, value]) => `<div><dt>${trainingEscape(label)}</dt><dd>${trainingEscape(value)}</dd></div>`).join("")}</dl><h3>Training error per iteration</h3>${lossChart(report?.lossHistory)}${comparison}<details class="training-json"><summary>View metadata and JSON report</summary><pre>${trainingEscape(JSON.stringify({ metadata, trainingReport: report }, null, 2))}</pre></details>`;
+  trainingElements["training-detail"].innerHTML = `<div class="section-heading"><h2 id="training-detail-heading">${trainingEscape(row.modelId)}</h2>${activation}</div><dl class="training-facts">${facts.map(([label, value]) => `<div><dt>${trainingEscape(label)}</dt><dd>${trainingEscape(value)}</dd></div>`).join("")}</dl><h3>Training error per iteration</h3>${lossChart(report?.lossHistory)}${comparison}<details class="training-json"><summary>View metadata and JSON report</summary><pre>${trainingEscape(JSON.stringify({ metadata, trainingReport: report }, null, 2))}</pre></details>`;
 }
 async function loadTraining() {
   const revision = ++trainingLoadRevision;
@@ -85,3 +91,27 @@ document.addEventListener("training-data-cleared", () => {
 document.addEventListener("training-data-changed", loadTraining);
 document.addEventListener("locale-changed", renderTraining);
 loadTraining();
+
+trainingElements["training-detail"].addEventListener("click", async (event) => {
+  if (!event.target.closest("#activate-model") || trainingState.activating || trainingState.trainingBusy) return;
+  const row = trainingState.iterations.find((iteration) => iteration.id === trainingState.selectedId);
+  if (!row?.canActivate || row.active) return;
+  if (!trainingState.canManage) { window.location.assign("/api/train?login=true"); return; }
+  trainingState.activating = true;
+  renderTraining();
+  try {
+    const response = await fetch(`/api/train?action=activate&modelId=${encodeURIComponent(row.id)}`, { method: "POST" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not activate model.");
+    document.dispatchEvent(new CustomEvent("training-model-activated"));
+    await loadTraining();
+    trainingElements["training-notice"].textContent = window.i18n.t("Model activated.");
+  } catch (error) {
+    trainingElements["training-notice"].textContent = window.i18n.t(error.message);
+  } finally { trainingState.activating = false; renderTraining(); }
+});
+document.addEventListener("training-model-status", (event) => {
+  trainingState.canManage = event.detail.canManageTraining === true;
+  trainingState.trainingBusy = ["running", "clearing"].includes(event.detail.training.status);
+  renderTraining();
+});

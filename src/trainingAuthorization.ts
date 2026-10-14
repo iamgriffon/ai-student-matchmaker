@@ -6,20 +6,19 @@ const HTTP_FORBIDDEN = 403;
 const HTTP_UNAVAILABLE = 503;
 const ACCESS_COOKIE_PREFIX = "CF_Authorization=";
 
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+export function isLocalDevelopment(request: Request, env: AccessEnv): boolean {
+  return env.LOCAL_DEVELOPMENT === "true" && LOCAL_HOSTNAMES.has(new URL(request.url).hostname);
+}
+
 export async function requireTrainingAuthorization(request: Request, env: AccessEnv) {
-  const url = new URL(request.url);
-  // This flag is injected only by the loopback-bound local dev launcher.
-  if (env.LOCAL_DEVELOPMENT === "true" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
-    if (request.headers.get("origin") !== url.origin) throw new HttpError(HTTP_FORBIDDEN, "A same-origin browser request is required.");
-    return;
-  }
-  if (request.headers.get("origin") !== url.origin) throw new HttpError(HTTP_FORBIDDEN, "A same-origin browser request is required.");
+  if (request.headers.get("origin") !== new URL(request.url).origin) throw new HttpError(HTTP_FORBIDDEN, "A same-origin browser request is required.");
   if (!await canManageTraining(request, env)) throw new HttpError(HTTP_FORBIDDEN, "Only the administrator signed in with Cloudflare Access can manage training.");
 }
 
 export async function canManageTraining(request: Request, env: AccessEnv): Promise<boolean> {
-  const hostname = new URL(request.url).hostname;
-  if (env.LOCAL_DEVELOPMENT === "true" && ["localhost", "127.0.0.1", "[::1]"].includes(hostname)) return true;
+  if (isLocalDevelopment(request, env)) return true;
   if (!env.ADMIN_EMAIL?.trim()) return false;
   try {
     const identity = await verifyAccessIdentity(request, env);

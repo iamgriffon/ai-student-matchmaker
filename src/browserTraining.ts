@@ -79,6 +79,8 @@ export async function updateBrowserTraining(env: Env, input: unknown) {
     const metadata = payload.artifact.metadata;
     const rates = options.compareLearningRates ? [...new Set([COMPARISON_LEARNING_RATE, options.learningRate])] : [options.learningRate];
     if (!payload.trainingReport || metadata.sourceContextVersion !== stored.contextVersion ||
+      JSON.stringify(metadata.categoryWeights) !== JSON.stringify(options.categoryWeights) ||
+      JSON.stringify(payload.trainingReport.categoryWeights) !== JSON.stringify(options.categoryWeights) ||
       metadata.epochs !== options.epochs || metadata.learningRate !== rates[iteration - 1] ||
       metadata.validationStrategy !== "student-disjoint" ||
       JSON.stringify(payload.artifact.modelTopology.config.layers.map((layer) => layer.config.units)) !== JSON.stringify(ARCHITECTURE)) {

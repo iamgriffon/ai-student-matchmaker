@@ -117,3 +117,23 @@ policy for the API. The application independently verifies Access JWTs and
 Unauthenticated action buttons navigate to `/api/train?login=true`; after Access
 login, that route redirects back to the public training page. The existing
 loopback-only local development training bypass is preserved.
+
+### Training policy and model selection
+
+The training modal accepts relative weights for academic balance, income diversity,
+and disability diversity (defaults: 0.7 / 0.2 / 0.1). They are validated and
+normalized before generating browser training targets, then saved in model metadata
+and the training report. Changing weights does not rebuild student or pair vectors
+and does not change the academic eligibility threshold.
+
+Training history offers **Use as current model** for compatible models from the
+current cohort. Activation requires administrator authorization, a completed run,
+passing validation metrics, and no active training/clear operation. The current
+selection changes transactionally; the frontend refreshes model status and discards
+recommendations cached under a different model.
+
+Local development (`bun dev --local` or the local Wrangler launcher) permits
+training, model activation, and deletion without Cloudflare login. This requires
+both the launcher-injected `LOCAL_DEVELOPMENT=true` flag and a loopback hostname;
+mutations still require a same-origin browser request. Production keeps Access
+JWT and administrator-email checks.

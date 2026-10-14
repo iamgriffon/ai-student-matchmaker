@@ -111,6 +111,15 @@
           <label>Iterations<input id="training-epochs" name="epochs" type="number" min="1" step="1" value="80" required /></label>
         </div>
         <label>Batch size<input id="training-batch-size" name="batchSize" type="number" min="1" max="256" step="1" value="64" required /></label>
+        <details class="training-weight-settings">
+          <summary>Category weights</summary>
+          <p>Relative weights are normalized automatically. Academic eligibility stays unchanged.</p>
+          <div class="form-grid">
+            <label>Academic balance<input id="training-weight-balance" type="number" min="0" step="any" value="0.7" required /></label>
+            <label>Income diversity<input id="training-weight-income" type="number" min="0" step="any" value="0.2" required /></label>
+            <label>Disability diversity<input id="training-weight-disability" type="number" min="0" step="any" value="0.1" required /></label>
+          </div>
+        </details>
         <label class="checkbox"><input id="compare-learning-rates" name="compareLearningRates" type="checkbox" /> Also compare with learning rate 0.01</label>
         <p id="training-form-error" class="form-error" role="alert" hidden></p>
         <div class="form-actions"><button type="button" id="cancel-training" class="secondary">Cancel</button><button id="submit-training" type="submit" class="primary">Start training</button></div>

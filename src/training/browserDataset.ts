@@ -1,3 +1,4 @@
+import { DEFAULT_CATEGORY_WEIGHTS, type CategoryWeights } from "../categoryWeights.ts";
 import { evaluatePair, readPairFeatures } from "../pairPolicy.ts";
 import type { TrainingSample } from "./types.ts";
 
@@ -11,7 +12,7 @@ const MAX_TRAINING_PAIRS = 3000;
 const MAX_VALIDATION_PAIRS = 1000;
 const MIN_PARTITION_PAIRS = 200;
 
-export async function browserDataset(context: BrowserContext) {
+export async function browserDataset(context: BrowserContext, categoryWeights: CategoryWeights = DEFAULT_CATEGORY_WEIGHTS) {
   const keyed = await Promise.all(context.students.map(async (student) => {
     const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(student.userId));
     return { student, key: Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("") };
@@ -31,7 +32,7 @@ export async function browserDataset(context: BrowserContext) {
           Math.abs(a.features.income - b.features.income),
           Math.abs(a.features.disability - b.features.disability),
         ]);
-        const policy = evaluatePair(features);
+        const policy = evaluatePair(features, undefined, categoryWeights);
         result.set(userAId + ":" + userBId, { userAId, userBId, features, target: policy.score, eligible: policy.eligible });
       }
     }

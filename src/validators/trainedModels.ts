@@ -1,3 +1,4 @@
+import { categoryWeightsSchema } from "../categoryWeights.ts";
 import { encodeBase64, decodeBase64 } from "../training/encoding.ts";
 import { z } from "zod";
 import { PAIR_RANKER_INPUT_COUNT, PAIR_RANKER_OUTPUT_COUNT } from "../modelConfig.ts";
@@ -13,6 +14,7 @@ const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/
 export const modelIdSchema = z.string().regex(/^pair-ranker-[a-f0-9]{12}$/, "Identificador de modelo inválido");
 
 const metadataFields = {
+  categoryWeights: categoryWeightsSchema.optional(),
   modelId: z.string().min(1), encoderVersion: z.string().min(1), policyVersion: z.string().min(1),
   labelSource: z.literal("policy-generated"), sourceContextVersion: z.string().min(1),
   trainedAt: z.iso.datetime(), sampleCount: z.number().int().positive(),
@@ -88,6 +90,7 @@ export const rankerArtifactSchema = z.object({
 });
 
 export const trainingReportSchema = z.object({
+  categoryWeights: categoryWeightsSchema.optional(),
   labelSource: z.literal("policy-generated"), validationStrategy: z.enum(["pair-holdout", "student-disjoint"]),
   batchSize: z.number().int().positive().optional(),
   architecture: z.array(z.number().int().positive()).optional(), epochs: z.number().int().positive().optional(),

@@ -9,7 +9,7 @@ self.onmessage = async (event: MessageEvent<{ context: BrowserContext; options: 
   running = true;
   try {
     const options = trainingOptionsSchema.parse(event.data.options);
-    const dataset = await browserDataset(event.data.context);
+    const dataset = await browserDataset(event.data.context, options.categoryWeights);
     const rates = options.compareLearningRates ? [...new Set([COMPARISON_LEARNING_RATE, options.learningRate])] : [options.learningRate];
     await prepareTrainingBackend();
     for (const [index, learningRate] of rates.entries()) {
@@ -23,10 +23,10 @@ self.onmessage = async (event: MessageEvent<{ context: BrowserContext; options: 
         onEpoch: (epoch, loss) => { lossHistory.push({ epoch: epoch + 1, loss }); },
       });
       try {
-        const artifact = await serializeRanker(model.model, model.metadata);
+        const artifact = await serializeRanker(model.model, { ...model.metadata, categoryWeights: options.categoryWeights });
         self.postMessage({ type: "model", iteration: index + 1, artifact, report: {
           modelId: artifact.metadata.modelId, labelSource: "policy-generated", validationStrategy: "student-disjoint",
-          architecture: [4, 128, 64, 32, 1], epochs: options.epochs, batchSize: options.batchSize,
+          categoryWeights: options.categoryWeights, architecture: [4, 128, 64, 32, 1], epochs: options.epochs, batchSize: options.batchSize,
           trainingStudents: dataset.trainingStudents, validationStudents: dataset.validationStudents,
           trainingPairs: dataset.training.length, validationPairs: dataset.validation.length,
           excludedCrossGroupPairs: 0, comparisons: [artifact.metadata], lossHistory,

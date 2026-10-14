@@ -215,3 +215,8 @@ small { display: block; margin-top: var(--space-xs); color: #7c8b84; font-weight
   .sociodiversity-index { grid-row: 3; }
   .recommendation:has(.sociodiversity-index) > .start-pair { grid-row: 4; }
 }
+
+.training-weight-settings { margin-top: var(--space-xl); }
+.training-weight-settings summary { cursor: pointer; font-weight: 600; }
+.training-weight-settings p { margin-block: var(--space-md); }
+.training-weight-settings .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-lg); }

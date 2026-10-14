@@ -1,10 +1,11 @@
 import { HttpError } from "./database.ts";
-import { verifyAccessIdentity, type AccessEnv } from "./trainingAuthorization.ts";
+import { isLocalDevelopment, verifyAccessIdentity, type AccessEnv } from "./trainingAuthorization.ts";
 
 type StudentAuthorizationEnv = AccessEnv & { ADMIN_EMAIL?: string };
 const HTTP_FORBIDDEN = 403;
 
 export async function canDeleteStudents(request: Request, env: StudentAuthorizationEnv): Promise<boolean> {
+  if (isLocalDevelopment(request, env)) return true;
   if (!env.ADMIN_EMAIL?.trim()) return false;
   try {
     const identity = await verifyAccessIdentity(request, env);

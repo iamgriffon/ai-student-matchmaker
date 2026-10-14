@@ -228,5 +228,17 @@
   "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}",
   "Training exceeded the Worker CPU limit.": "Training exceeded the Worker CPU limit.",
   "Training in your browser. Keep this page open.": "Training in your browser. Keep this page open.",
-  "Sociodiversity index": "Sociodiversity index"
+  "Sociodiversity index": "Sociodiversity index",
+  "Category weights": "Category weights",
+  "Relative weights are normalized automatically. Academic eligibility stays unchanged.": "Relative weights are normalized automatically. Academic eligibility stays unchanged.",
+  "Academic balance": "Academic balance",
+  "Income diversity": "Income diversity",
+  "Disability diversity": "Disability diversity",
+  "At least one category weight must be positive.": "At least one category weight must be positive.",
+  "Use as current model": "Use as current model",
+  "Activating…": "Activating…",
+  "Model activated.": "Model activated.",
+  "Could not activate model.": "Could not activate model.",
+  "This model is incompatible with the current cohort or validation requirements.": "This model is incompatible with the current cohort or validation requirements.",
+  "The cohort changed or another training operation is running. Refresh and try again.": "The cohort changed or another training operation is running. Refresh and try again."
 }
