@@ -226,5 +226,6 @@
   "Batch size": "Batch size",
   "Tensor memory: {memory} MiB": "Tensor memory: {memory} MiB",
   "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}",
-  "Training exceeded the Worker CPU limit.": "Training exceeded the Worker CPU limit."
+  "Training exceeded the Worker CPU limit.": "Training exceeded the Worker CPU limit.",
+  "Training in your browser. Keep this page open.": "Training in your browser. Keep this page open."
 }

@@ -226,5 +226,6 @@
   "Batch size": "Tamanho do lote",
   "Tensor memory: {memory} MiB": "Memória dos tensores: {memory} MiB",
   "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Treinamento {iteration}/{iterationCount} · iteração {epoch}/{totalEpochs} · lote {batch}/{totalBatches}",
-  "Training exceeded the Worker CPU limit.": "O treinamento excedeu o limite de CPU do Worker."
+  "Training exceeded the Worker CPU limit.": "O treinamento excedeu o limite de CPU do Worker.",
+  "Training in your browser. Keep this page open.": "Treinando no seu navegador. Mantenha esta página aberta."
 }

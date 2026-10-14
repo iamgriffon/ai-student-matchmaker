@@ -20,6 +20,7 @@
   const banner = document.getElementById("model-required");
   const heading = document.getElementById("model-required-heading");
   const progress = document.getElementById("training-progress");
+  let browserTraining = null;
   let requesting = false;
   let refreshPromise = null;
   let timer = null;
@@ -36,6 +37,7 @@
     trackingJobId = null;
   }
   function trackWithStream(data) {
+    if (browserTraining) return true;
     if (!data.trainingStream || typeof EventSource == 'undefined') return false;
     const jobId = data.training.jobId ?? "current";
     if (streamFallbackJobId === jobId) return false;
@@ -67,6 +69,55 @@
     source.addEventListener("stream-failed", fallback);
     source.onerror = fallback;
     return true;
+  }
+
+  async function updateBrowserJob(jobId, update) {
+    const response = await fetch("/api/train?action=update", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jobId, ...update }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not save browser training.");
+    return data;
+  }
+  function startBrowserWorker(result) {
+    const worker = new Worker("/generated/training-worker.js");
+    const jobId = result.training.jobId;
+    browserTraining = { worker, jobId };
+    closeTrackingStream();
+    let writes = Promise.resolve();
+    let lastHeartbeat = 0;
+    let finishing = false;
+    const HEARTBEAT_INTERVAL_MS = 5000;
+    const finish = async (error = null) => {
+      if (finishing) return;
+      finishing = true;
+      worker.terminate();
+      if (error) {
+        await updateBrowserJob(jobId, { action: "failed" }).catch(() => {});
+      }
+      browserTraining = null;
+      await refresh();
+      if (error) message.textContent = error.message;
+    };
+    worker.onerror = (event) => { finish(new Error(event.message || "Could not load the browser training worker.")); };
+    worker.onmessage = ({ data }) => {
+      if (finishing) return;
+      if (data.type === "progress") {
+        renderStatus({ ...lastSnapshot, training: { ...result.training, ...data.progress, status: "running" } });
+        if (Date.now() - lastHeartbeat >= HEARTBEAT_INTERVAL_MS) {
+          lastHeartbeat = Date.now();
+          writes = writes.then(() => updateBrowserJob(jobId, { action: "progress", progress: data.progress }));
+          writes.catch(finish);
+        }
+      } else if (data.type === "model") {
+        writes = writes.then(() => updateBrowserJob(jobId, { action: "model", iteration: data.iteration, artifact: data.artifact, report: data.report }));
+        writes.catch(finish);
+      } else if (data.type === "complete") {
+        writes.then(() => updateBrowserJob(jobId, { action: "complete" })).then(() => finish()).catch(finish);
+      } else if (data.type === "failed") finish(new Error(data.message));
+    };
+    worker.postMessage({ context: result.context, options: result.options });
   }
 
   async function request(method = "GET", options = null) {
@@ -157,7 +208,10 @@
         document.dispatchEvent(new CustomEvent("training-data-cleared"));
         renderStatus({ ...result, modelReady: false, modelId: null });
       }
-      if (method === "POST") dialog.close();
+      if (method === "POST") {
+        dialog.close();
+        if (result.executor === "browser") startBrowserWorker(result);
+      }
       document.dispatchEvent(new CustomEvent("training-data-changed"));
     } catch (error) { operationError = error.message; }
     finally {
@@ -197,7 +251,18 @@
   dialog.addEventListener("cancel", (event) => { if (requesting) event.preventDefault(); });
   clear?.addEventListener("click", () => mutate("DELETE"));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
-  window.addEventListener("pagehide", closeTrackingStream);
+  window.addEventListener("beforeunload", (event) => {
+    if (browserTraining) { event.preventDefault(); event.returnValue = ""; }
+  });
+  window.addEventListener("pagehide", () => {
+    closeTrackingStream();
+    if (browserTraining) {
+      const { worker, jobId } = browserTraining;
+      worker.terminate();
+      browserTraining = null;
+      navigator.sendBeacon("/api/train?action=update", new Blob([JSON.stringify({ jobId, action: "failed" })], { type: "application/json" }));
+    }
+  });
   window.addEventListener("pageshow", refresh);
   window.addEventListener("focus", refresh);
   document.addEventListener("locale-changed", refresh);

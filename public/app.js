@@ -327,8 +327,9 @@ async function generateRecommendations() {
     const response = await fetch(`/api/users/${encodeURIComponent(userId)}/recommendations`, {
       method: "POST", signal: recommendationController.signal,
     });
-    const data = await response.json().catch(() => ({}));
+    let data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Could not generate recommendations.");
+    if (data.inference) data = await window.rankRecommendations(data, recommendationController.signal);
     if (data.userId !== userId || !Array.isArray(data.recommendations) || !Number.isFinite(data.selectedScore) || !Number.isFinite(data.cohortMeanScore)) {
       throw new Error("The server returned invalid recommendations.");
     }

@@ -88,7 +88,7 @@ describe("training reactivity frontend", () => {
     expect(app.state.selectedId).toBe(FIRST_ID);
     expect(app.state.trainingBusy).toBe(false);
     expect(elements.get("recommendations")?.innerHTML).toContain("Caio");
-    expect(elements.get("notice")?.textContent).toContain("Modelo treinado");
+    expect(elements.get("notice")?.textContent).toContain("Model trained");
   });
 
   test("does not rebuild the student list on each training progress update", async () => {
@@ -107,7 +107,7 @@ describe("training reactivity frontend", () => {
     await app.generateRecommendations();
     await updateModel(false, "idle");
     expect(app.state.recommendationResult).toBeNull();
-    expect(elements.get("recommendations")?.innerHTML).toContain("Necessário treinar");
+    expect(elements.get("recommendations")?.innerHTML).toContain("Model training required");
     fetchMock.mockResolvedValueOnce(Response.json(RESULT));
     await updateModel(true, "completed", "pair-ranker-bbbbbbbbbbbb");
     expect(app.state.recommendationResult).not.toBeNull();
@@ -137,7 +137,7 @@ describe("recommendation frontend", () => {
     expect(fetchMock).toHaveBeenCalledWith(`/api/users/${FIRST_ID}/recommendations`, expect.objectContaining({ method: "POST" }));
     expect(app.state.recommendationLoading).toBe(false);
     expect(elements.get("recommendations")?.innerHTML).toContain("Caio");
-    expect(elements.get("recommendation-summary")?.textContent).toContain("1 recomendação");
+    expect(elements.get("recommendation-summary")?.textContent).toContain("1 recommendation");
   });
 
   test("shows loading and prevents duplicate requests", async () => {
@@ -146,7 +146,7 @@ describe("recommendation frontend", () => {
     const reading = app.generateRecommendations();
     expect(app.state.recommendationLoading).toBe(true);
     expect(elements.get("recommendations")?.innerHTML).toContain("recommendation-skeleton");
-    expect(elements.get("recommendation-summary")?.textContent).toContain("Buscando recomendações");
+    expect(elements.get("recommendation-summary")?.textContent).toContain("Loading recommendations");
     await app.generateRecommendations();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     pending.resolve(Response.json(RESULT));
@@ -167,14 +167,14 @@ describe("recommendation frontend", () => {
   test("renders the no-eligible-candidate state", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ ...RESULT, eligibleCount: 0, recommendations: [] }));
     await app.generateRecommendations();
-    expect(elements.get("recommendations")?.innerHTML).toContain("Nenhuma dupla atende");
+    expect(elements.get("recommendations")?.innerHTML).toContain("No study pairs meet");
   });
 
   test("rejects responses for a different selected student", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ ...RESULT, userId: SECOND_ID }));
     await app.generateRecommendations();
     expect(app.state.recommendationResult).toBeNull();
-    expect(app.state.recommendationError).toContain("recomendações inválidas");
+    expect(app.state.recommendationError).toContain("invalid recommendations");
   });
 
   test("ignores a late response after changing the selected student", async () => {
@@ -190,7 +190,7 @@ describe("recommendation frontend", () => {
     await reading;
     expect(app.state.recommendationResult).toBeNull();
     expect(app.state.recommendationLoading).toBe(false);
-    expect(elements.get("recommendations")?.innerHTML).toContain("Aguardando recomendações");
+    expect(elements.get("recommendations")?.innerHTML).toContain("Waiting for recommendations");
   });
 
   test("clears generated recommendations when the cohort is replaced", async () => {
@@ -210,7 +210,7 @@ describe("trained recommendations display", () => {
       model: { modelId: "fixture-trained-model", sampleCount: 3990, validationMeanAbsoluteError: 0.0016 },
     }));
     await app.generateRecommendations();
-    expect(elements.get("recommendation-summary")?.textContent).toBe("1 recomendação");
+    expect(elements.get("recommendation-summary")?.textContent).toBe("1 recommendation");
     expect(elements.get("recommendations")?.innerHTML).not.toContain("fixture-trained-model");
     expect(elements.get("recommendations")?.innerHTML).not.toContain("Pontuação:");
   });
@@ -218,7 +218,7 @@ describe("trained recommendations display", () => {
     fetchMock.mockResolvedValueOnce(Response.json({ ...RESULT, canStartPairs: false, rankingSource: "policy", model: null }));
     await app.generateRecommendations();
     expect(elements.get("recommendations")?.innerHTML).not.toContain("Start study pair");
-    expect(elements.get("recommendation-summary")?.textContent).toContain("Treine um modelo");
+    expect(elements.get("recommendation-summary")?.textContent).toContain("Train a model");
   });
   test("hides start actions for a pair already returned by the server", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ ...RESULT, recommendations: [{ ...RESULT.recommendations[0], outcomeId: "existing-pair" }] }));

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseId } from "./utils/idParser.ts";
-import { modelIdSchema } from "../db/validators/trainedModels.ts";
+import { modelIdSchema } from "./validators/trainedModels.ts";
 
 const MIN_SCORE = 0;
 const MAX_SCORE = 100;

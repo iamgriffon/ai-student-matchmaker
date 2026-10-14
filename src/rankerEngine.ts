@@ -1,12 +1,16 @@
+import { trainBatches, evaluateBatches } from "./training/batches.ts";
+import type { TrainingSample, TrainingBatchProgress } from "./training/types.ts";
+export type { TrainingSample, TrainingBatchProgress } from "./training/types.ts";
+export { predictPairScores } from "./training/prediction.ts";
 import * as tf from "@tensorflow/tfjs";
-import { createHash } from "node:crypto";
-import { PAIR_POLICY_VERSION, type PairFeatures, readPairFeatures } from "./pairPolicy.ts";
+import { encodeBase64, decodeBase64, modelHash } from "./training/encoding.ts";
+import { PAIR_POLICY_VERSION, readPairFeatures } from "./pairPolicy.ts";
 import { PAIR_ENCODER_VERSION } from "./vectorSchema.ts";
 import { parseId } from "./utils/idParser.ts";
-import { rankerArtifactSchema as artifactSchema, type RankerArtifact, type RankerMetadata } from "../db/validators/trainedModels.ts";
+import { rankerArtifactSchema as artifactSchema, type RankerArtifact, type RankerMetadata } from "./validators/trainedModels.ts";
 import { DEFAULT_EPOCHS, DEFAULT_LEARNING_RATE, MAX_VALIDATION_MAE, PAIR_RANKER_INPUT_COUNT, PAIR_RANKER_OUTPUT_COUNT, DEFAULT_TRAINING_BATCH_SIZE, MAX_TRAINING_BATCH_SIZE } from "./modelConfig.ts";
 export { DEFAULT_EPOCHS, DEFAULT_LEARNING_RATE, MAX_VALIDATION_MAE } from "./modelConfig.ts";
-export type { RankerArtifact, RankerMetadata } from "../db/validators/trainedModels.ts";
+export type { RankerArtifact, RankerMetadata } from "./validators/trainedModels.ts";
 
 const FEATURE_COUNT = PAIR_RANKER_INPUT_COUNT;
 const OUTPUT_COUNT = PAIR_RANKER_OUTPUT_COUNT;
@@ -23,32 +27,9 @@ const MIN_TRAINING_SAMPLES = 25;
 const MIN_SCORE = 0;
 const MAX_SCORE = 1;
 const MODEL_ID_HASH_LENGTH = 12;
-const DISPLAY_INDEX_OFFSET = 1;
-export type TrainingSample = { features: PairFeatures; target: number; eligible: boolean; userAId?: string; userBId?: string };
-
-export type TrainingBatchProgress = {
-  epoch: number; batch: number; totalBatches: number; processedSamples: number; sampleCount: number;
-  loss: number; tensorBytes: number; numTensors: number;
-};
-
 export async function prepareTrainingBackend() {
   await tf.setBackend("cpu");
   await tf.ready();
-}
-
-export function predictPairScores(model: tf.LayersModel, features: readonly PairFeatures[]): number[] {
-  if (!features.length) return [];
-  const scores = tf.tidy(() => {
-    const input = tf.tensor2d(features.map((row) => Array.from(readPairFeatures(row))), [features.length, FEATURE_COUNT]);
-    const prediction = model.predict(input);
-    if (Array.isArray(prediction)) throw new Error("O modelo deve ter uma única saída");
-    return Array.from(prediction.dataSync());
-  });
-  if (scores.length !== features.length || !scores.every(Number.isFinite)) {
-    throw new Error("O modelo produziu pontuações inválidas");
-  }
-  // A regressão pode ultrapassar ligeiramente os limites; a pontuação continua em [0, 1].
-  return scores.map((score) => Math.max(MIN_SCORE, Math.min(MAX_SCORE, score)));
 }
 
 export async function trainPairRanker(
@@ -100,54 +81,14 @@ export async function trainPairRanker(
   const optimizer = tf.train.adam(learningRate);
   model.compile({ optimizer, loss: "meanSquaredError" });
   try {
-    const totalBatches = Math.ceil(training.length / batchSize);
-    // The same model and Adam optimizer survive every batch and iteration.
-    // Only input/target tensors are recreated, so their size is bounded by batchSize.
-    for (let epoch = 0; epoch < epochs; epoch++) {
-      let weightedLoss = 0;
-      for (let offset = 0; offset < training.length; offset += batchSize) {
-        const batch = training.slice(offset, offset + batchSize);
-        const xs = tf.tensor2d(batch.map((sample) => Array.from(sample.features)), [batch.length, FEATURE_COUNT]);
-        let ys: tf.Tensor2D | undefined;
-        let loss: number;
-        try {
-          ys = tf.tensor2d(batch.map((sample) => [sample.target]), [batch.length, OUTPUT_COUNT]);
-          const result = await model.trainOnBatch(xs, ys);
-          const value = Array.isArray(result) ? result[0] : result;
-          if (typeof value == 'undefined' || !Number.isFinite(value)) throw new Error("Invalid training loss.");
-          loss = value;
-          weightedLoss += loss * batch.length;
-        } finally { xs.dispose(); ys?.dispose(); }
-        const memory = tf.memory();
-        await options.onBatch?.({ epoch, batch: Math.floor(offset / batchSize) + DISPLAY_INDEX_OFFSET, totalBatches,
-          processedSamples: Math.min(offset + batchSize, training.length), sampleCount: training.length,
-          loss, tensorBytes: memory.numBytes, numTensors: memory.numTensors });
-        // Yield for responsiveness; this does not reset a Cloudflare CPU budget.
-        await tf.nextFrame();
-      }
-      await options.onEpoch?.(epoch, weightedLoss / training.length);
-    }
-    // Accumulate errors rather than retaining tensors/predictions for the entire validation set.
-    let absoluteError = 0, eligibleAbsoluteError = 0, eligibleCount = 0;
-    for (let offset = 0; offset < validation.length; offset += batchSize) {
-      const batch = validation.slice(offset, offset + batchSize);
-      const predictions = predictPairScores(model, batch.map((sample) => sample.features));
-      for (const [index, sample] of batch.entries()) {
-        const prediction = predictions[index];
-        if (typeof prediction == 'undefined') throw new Error("Missing validation prediction.");
-        const error = Math.abs(prediction - sample.target);
-        absoluteError += error;
-        if (sample.eligible) { eligibleAbsoluteError += error; eligibleCount++; }
-      }
-      await tf.nextFrame();
-    }
+    await trainBatches(model, training, epochs, batchSize, options);
+    const metrics = await evaluateBatches(model, validation, batchSize);
     const metadata: RankerMetadata = {
       modelId: "pending-serialization", encoderVersion: PAIR_ENCODER_VERSION, policyVersion: PAIR_POLICY_VERSION,
       labelSource: "policy-generated", sourceContextVersion: contextVersion.trim(), trainedAt: new Date().toISOString(),
       learningRate, validationStrategy: hasExplicitValidation ? "student-disjoint" : "pair-holdout",
       sampleCount: training.length + validation.length, trainingCount: training.length, validationCount: validation.length, epochs,
-      validationMeanAbsoluteError: absoluteError / validation.length,
-      eligibleValidationMeanAbsoluteError: eligibleCount ? eligibleAbsoluteError / eligibleCount : null,
+      ...metrics,
     };
     return { model, metadata };
   } catch (error) {
@@ -166,17 +107,20 @@ export async function serializeRanker(model: tf.LayersModel, metadata: RankerMet
   }), { includeOptimizer: false });
   if (typeof captured == 'undefined' || !captured.weightData || !captured.modelTopology || !captured.weightSpecs) throw new Error("Artefato de modelo incompleto");
   const weightData = Array.isArray(captured.weightData) ? tf.io.concatenateArrayBuffers(captured.weightData) : captured.weightData;
-  const weights = Buffer.from(weightData);
-  const hash = createHash("sha256").update(JSON.stringify(captured.modelTopology)).update(weights).digest("hex");
-  return artifactSchema.parse({
-    metadata: { ...metadata, modelId: `pair-ranker-${hash.slice(MIN_SCORE, MODEL_ID_HASH_LENGTH)}` },
-    modelTopology: captured.modelTopology, weightSpecs: captured.weightSpecs, weightData: weights.toString("base64"),
+  const weights = new Uint8Array(weightData);
+  // Zod normalizes key order. Hash the persisted topology, not TensorFlow's raw object.
+  const artifact = artifactSchema.parse({
+    metadata: { ...metadata, modelId: "pair-ranker-000000000000" },
+    modelTopology: captured.modelTopology, weightSpecs: captured.weightSpecs, weightData: encodeBase64(weights),
   });
+  const hash = await modelHash(artifact.modelTopology, weights);
+  artifact.metadata.modelId = `pair-ranker-${hash.slice(MIN_SCORE, MODEL_ID_HASH_LENGTH)}`;
+  return artifact;
 }
 
 export async function deserializeRanker(value: unknown) {
   const artifact = artifactSchema.parse(value);
-  const weightData = Uint8Array.from(Buffer.from(artifact.weightData, "base64")).buffer;
+  const weightData = decodeBase64(artifact.weightData).buffer;
   const model = await tf.loadLayersModel(tf.io.fromMemory({ modelTopology: artifact.modelTopology, weightSpecs: artifact.weightSpecs, weightData }));
   if (model.inputs[0]?.shape.at(-1) !== FEATURE_COUNT || model.outputs.length !== OUTPUT_COUNT || model.outputs[0]?.shape.at(-1) !== OUTPUT_COUNT) {
     model.dispose();
