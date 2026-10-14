@@ -123,10 +123,17 @@ Protocol: authenticated `POST /training` with `{ "jobId": "UUID", "options": { "
 
 Deletion immediately clears the UI history, selection and count. Pending history requests are aborted and cannot restore deleted rows; physical Vectorize deletion continues through the durable outbox after the API response.
 
-## Authorizing training requests
+## Authorizing training requests with Cloudflare Access
 
-Start training with `POST /api/train?learningRate=0.001&epochs=80&compareLearningRates=false` and `Authorization: Bearer <training-access-key>`. `GET /api/train` never starts a run. The previous `POST /api/training` alias requires the same authorization.
+Start training with `POST /api/train?learningRate=0.001&epochs=80&compareLearningRates=false`. `DELETE /api/train` clears training data. Both require an authenticated Cloudflare Access invocation. `GET /api/train` never starts a run. The previous POST/DELETE `/api/training` aliases require the same Access authorization.
 
-Store the administrator key as the Worker secret `TRAINING_ADMIN_TOKEN` (`bunx wrangler secret put TRAINING_ADMIN_TOKEN` from `cloudflare/`). Keep it separate from `TRAINING_SERVICE_TOKEN`, which authenticates the Worker to the Bun service. A missing admin secret returns HTTP 503; an invalid key returns HTTP 401 before creating a job or contacting the service.
+The Worker checks the native `ctx.access` context created by Cloudflare after authentication. Missing Access returns HTTP 403 before any job is created or deleted. Forged identity headers cannot create that context. The modal contains no access-key field and sends no shared secret; the browser uses its Access session. `TRAINING_ADMIN_TOKEN` is no longer used. `TRAINING_SERVICE_TOKEN` remains necessary for the Worker to authenticate to the hosted Bun service.
 
-The modal does not ask for or send the administrative key. The key remains a backend secret for authorized administrative callers. Browser-initiated training requires a separately configured authenticated session or Cloudflare Access; until that authorization is connected, the protected API rejects unauthenticated starts. An environment variable embedded in frontend JavaScript would be visible to every visitor and cannot provide authorization.
+In Zero Trust → Access → Applications, create a self-hosted application with both public hostnames/paths in the same application:
+
+- `vestibulandos.guusilveira.workers.dev/training`
+- `vestibulandos.guusilveira.workers.dev/api/train`
+
+Add an Allow policy containing only authorized administrators. Visiting `/training` completes login; the same Access application/session authorizes the modal's API requests. Status/history GET endpoints remain public. If using the legacy mutation aliases, protect `/api/training` with Access too. Do not use a Bypass policy for training. Worker-level Access is another option if the entire application should require login.
+
+Reference: https://developers.cloudflare.com/workers/configuration/cloudflare-access/#read-authenticated-user-identity-with-ctxaccess

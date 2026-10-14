@@ -28,7 +28,7 @@
       learningRate: String(options.learningRate), epochs: String(options.epochs),
       compareLearningRates: String(options.compareLearningRates),
     }) : null;
-    const path = method === "POST" ? `${useTrainEndpoint ? "/api/train" : "/api/training"}?${params}` : "/api/training";
+    const path = method === "POST" ? `${useTrainEndpoint ? "/api/train" : "/api/training"}?${params}` : method === "DELETE" && useTrainEndpoint ? "/api/train" : "/api/training";
     const response = await fetch(path, { method });
     const data = await response.json().catch(() => {
       throw new Error(window.i18n.t("The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.", { status: response.status }));

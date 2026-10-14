@@ -86,7 +86,7 @@ export default {
         cleanupVectors(env, ctx);
         return json(HTTP.ok, result);
       }
-      if (path === "/api/train" && request.method !== "POST") return methodError("POST");
+      if (path === "/api/train" && !["POST", "DELETE"].includes(request.method)) return methodError("POST, DELETE");
       if (path === "/api/training" || path === "/api/train") {
         if (request.method === "GET") {
           const [model, training] = await Promise.all([activeModel(db), latestTraining(env)]);
@@ -94,7 +94,7 @@ export default {
           return json(HTTP.ok, { training, executor: "external", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
-          requireTrainingAuthorization(request, env);
+          requireTrainingAuthorization(ctx);
           const options = trainingOptionsSchema.parse({
             learningRate: url.searchParams.get("learningRate") ?? undefined,
             epochs: url.searchParams.get("epochs") ?? undefined,
@@ -103,6 +103,7 @@ export default {
           return json(HTTP.accepted, { training: await startTraining(env, options) });
         }
         if (request.method === "DELETE") {
+          requireTrainingAuthorization(ctx);
           const result = await clearTrainingData(env);
           cleanupVectors(env, ctx);
           return json(HTTP.ok, result);
