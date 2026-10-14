@@ -75,11 +75,13 @@ References: [Prisma D1 integration](https://www.prisma.io/docs/guides/v7/deploym
 
 ## Cloudflare Workers Builds (Git integration)
 
+The production Worker name is **ai-student-matchmaker**, matching `https://ai-student-matchmaker.guusilveira.workers.dev/` and the `name` in `wrangler.jsonc`. D1 and Vectorize resource names remain `vestibulandos*`; they do not have to match the Worker name.
+
 Select branch **cloudflare** and keep the repository root as the root directory. Configure:
 
 - Build command: `bun run build`
 - Deploy command: `bun run deploy`
 
-The root build installs `cloudflare/` dependencies, generates the Prisma D1 client and validates the Worker bundle with a dry run. The deploy command uses `cloudflare/wrangler.jsonc`. If the dashboard currently uses `npx wrangler deploy`, replace it with `bun run deploy` so Wrangler runs from the Cloudflare package.
+The root build installs `cloudflare/` dependencies, generates the Prisma D1 client and validates the Worker bundle with a dry run. The deploy command uses `cloudflare/wrangler.jsonc`. An assets-only deployment will serve the frontend but return empty 404 responses for `/api/*`; deploy the configured `src/index.ts` Worker together with its bindings. If the dashboard currently uses `npx wrangler deploy`, replace it with `bun run deploy` so Wrangler runs from the Cloudflare package.
 
 The old Node commands are explicit aliases: `bun run build:node`, `bun run dev:node` and `bun run deploy:node`. The `main` branch is not modified by this fix.

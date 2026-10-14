@@ -179,7 +179,9 @@ function render() {
 
 async function requestUsers(path, options) {
   const response = await fetch(path, options);
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => {
+    throw new Error(window.i18n.t("The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.", { status: response.status }));
+  });
   if (!response.ok) throw new Error(data.error || data.message || "Could not complete the operation. Please try again.");
   if (!Array.isArray(data.users)) throw new Error("The server returned an invalid student list.");
   return data.users;

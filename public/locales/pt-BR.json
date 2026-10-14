@@ -216,5 +216,7 @@
   "Enter a valid nonnegative income.": "Informe uma renda válida maior ou igual a zero.",
   "Name is required": "O nome é obrigatório",
   "Enter a valid email address": "Informe um e-mail válido",
-  "Income is required": "A renda é obrigatória"
+  "Income is required": "A renda é obrigatória",
+  "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.": "A API retornou uma resposta vazia ou inválida (HTTP {status}). Verifique o deploy do Worker.",
+  "Could not load model status": "Não foi possível carregar o estado do modelo"
 }

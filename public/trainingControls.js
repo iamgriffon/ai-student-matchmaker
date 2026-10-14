@@ -29,7 +29,9 @@
     }) : null;
     const path = method === "POST" ? `/api/training?${params}` : "/api/training";
     const response = await fetch(path, { method });
-    const data = await response.json();
+    const data = await response.json().catch(() => {
+      throw new Error(window.i18n.t("The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.", { status: response.status }));
+    });
     if (!response.ok) throw new Error(data.error || "Could not complete the training operation.");
     return data;
   }
@@ -69,6 +71,8 @@
       try { renderStatus(await request()); }
       catch (error) {
         if (banner) banner.hidden = false;
+        if (heading) heading.textContent = "Could not load model status";
+        start.disabled = true;
         message.textContent = error.message;
         clearTimeout(timer);
         timer = setTimeout(refresh, POLL_INTERVAL_MS);

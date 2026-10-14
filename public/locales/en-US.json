@@ -216,5 +216,7 @@
   "Enter a valid nonnegative income.": "Enter a valid nonnegative income.",
   "Name is required": "Name is required",
   "Enter a valid email address": "Enter a valid email address",
-  "Income is required": "Income is required"
+  "Income is required": "Income is required",
+  "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.": "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.",
+  "Could not load model status": "Could not load model status"
 }

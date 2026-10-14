@@ -181,5 +181,7 @@
   "Modelo incompatível com o encoder ou a política atual": "The model is incompatible with the current encoder or policy",
   "O modelo não atingiu o limite de erro de validação": "The model did not meet the validation error threshold",
   "Modelo não encontrado": "Model not found",
-  "Modelo não encontrado.": "Model not found."
+  "Modelo não encontrado.": "Model not found.",
+  "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.": "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.",
+  "Could not load model status": "Could not load model status"
 }
