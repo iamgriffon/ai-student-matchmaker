@@ -14,9 +14,10 @@
     "seed:remote": "bun scripts/seed.ts --remote"
   },
   "dependencies": {
-    "@prisma/client": "7.10.0",
     "@prisma/adapter-d1": "7.10.0",
+    "@prisma/client": "7.10.0",
     "@tensorflow/tfjs": "4.22.0",
+    "jose": "^6.2.12",
     "zod": "4.6.5"
   },
   "devDependencies": {

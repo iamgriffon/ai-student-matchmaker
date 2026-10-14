@@ -4,6 +4,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "https://dupin-dev.cloudflareaccess.com",
+    "ACCESS_AUD": "f1cc9070f6d5581a93d80c1e11d512518041fb8e6f543c81fe07c488cef7c351"
+  },
   "assets": { "directory": "../public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/training"] },
   "d1_databases": [{ "binding": "DB", "database_name": "vestibulandos", "database_id": "4d271143-3bbd-4b7d-9107-2a531003f413", "migrations_dir": "migrations" }],
   "vectorize": [

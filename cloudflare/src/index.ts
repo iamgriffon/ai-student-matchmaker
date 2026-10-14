@@ -94,7 +94,7 @@ export default {
           return json(HTTP.ok, { training, executor: "external", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
-          requireTrainingAuthorization(ctx);
+          await requireTrainingAuthorization(request, env);
           const options = trainingOptionsSchema.parse({
             learningRate: url.searchParams.get("learningRate") ?? undefined,
             epochs: url.searchParams.get("epochs") ?? undefined,
@@ -103,7 +103,7 @@ export default {
           return json(HTTP.accepted, { training: await startTraining(env, options) });
         }
         if (request.method === "DELETE") {
-          requireTrainingAuthorization(ctx);
+          await requireTrainingAuthorization(request, env);
           const result = await clearTrainingData(env);
           cleanupVectors(env, ctx);
           return json(HTTP.ok, result);

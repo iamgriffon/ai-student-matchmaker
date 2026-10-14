@@ -127,7 +127,7 @@ Deletion immediately clears the UI history, selection and count. Pending history
 
 Start training with `POST /api/train?learningRate=0.001&epochs=80&compareLearningRates=false`. `DELETE /api/train` clears training data. Both require an authenticated Cloudflare Access invocation. `GET /api/train` never starts a run. The previous POST/DELETE `/api/training` aliases require the same Access authorization.
 
-The Worker checks the native `ctx.access` context created by Cloudflare after authentication. Missing Access returns HTTP 403 before any job is created or deleted. Forged identity headers cannot create that context. The modal contains no access-key field and sends no shared secret; the browser uses its Access session. `TRAINING_ADMIN_TOKEN` is no longer used. `TRAINING_SERVICE_TOKEN` remains necessary for the Worker to authenticate to the hosted Bun service.
+The Worker verifies the Access JWT using the team’s public signing keys, expected issuer/application audience, RS256 signature and expiration. It reads `Cf-Access-Jwt-Assertion` or the `CF_Authorization` cookie; it does not rely on `ctx.access`, which was absent for this deployment. Missing Access returns HTTP 403 before any job is created or deleted. Forged identity headers cannot create that context. The modal contains no access-key field and sends no shared secret; the browser uses its Access session. `TRAINING_ADMIN_TOKEN` is no longer used. `TRAINING_SERVICE_TOKEN` remains necessary for the Worker to authenticate to the hosted Bun service.
 
 In Zero Trust → Access → Applications, create a self-hosted application with both public hostnames/paths in the same application:
 
@@ -136,4 +136,6 @@ In Zero Trust → Access → Applications, create a self-hosted application with
 
 Add an Allow policy containing only authorized administrators. Visiting `/training` completes login; the same Access application/session authorizes the modal's API requests. Status/history GET endpoints remain public. If using the legacy mutation aliases, protect `/api/training` with Access too. Do not use a Bypass policy for training. Worker-level Access is another option if the entire application should require login.
 
-Reference: https://developers.cloudflare.com/workers/configuration/cloudflare-access/#read-authenticated-user-identity-with-ctxaccess
+`ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are public application identifiers persisted in `wrangler.jsonc`, not login tokens.
+
+Reference: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
