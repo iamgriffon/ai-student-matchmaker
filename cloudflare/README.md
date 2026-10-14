@@ -8,7 +8,7 @@ This directory is the Cloudflare implementation on the `cloudflare` branch. On t
 - **Prisma ORM 7 + `@prisma/adapter-d1`**: relational data in D1. The experimental Prisma 8 PostgreSQL contract is not a D1 adapter; this target has its own SQLite schema and generated client.
 - **Vectorize**: student vectors with three features and pair vectors with four features, stored in separate 32-dimensional Euclidean indexes. Extra coordinates are zero padding, preserving distances and the ranker’s four inputs. D1 stores vector IDs and cohort context, not JSON arrays of vectors.
 - **D1 JSON**: model artifacts and reports, validated with the existing Zod schemas. SQLite stores JSON rather than PostgreSQL `jsonb`.
-- **External training**: Bun runs TensorFlow.js with a CPU backend and uploads models/reports through Wrangler. D1 tracks progress and enforces one active operation. Defaults remain one ranker, learning rate `0.001`, 80 iterations, with optional comparison. The legacy Workflow implementation is retained but the production training endpoint does not start it.
+- **Workflow training**: the modal calls `/api/train`, which starts the existing `TRAINING` binding directly. TensorFlow runs in the deployed Worker; D1 tracks progress, models and reports. Defaults remain one ranker, learning rate `0.001`, 80 iterations, with optional comparison.
 - **Shared engine**: normalization, eligibility, validation schemas and model training preserve the original semantics. The Postgres cache adapter remains separate.
 
 Vectorize mutations are eventually consistent. Recommendation eligibility and final model ranking use the full current cohort, so an indexing delay cannot remove a valid recommendation. Versioned vector IDs, cohort namespaces, generation changes and a D1 deletion outbox prevent stale writes or delayed deletions from making old vectors current. Vectorize similarity is a candidate ordering hint; it does not replace academic balance or the learned ranking.
@@ -56,9 +56,9 @@ bun run deploy
 
 No Postgres reset or data migration is implicit. The seed is idempotent and inserts the existing synthetic CSV dataset. It does not overwrite students or import previous model/history records. For a data migration, export those records explicitly, validate artifacts with Zod and load them into D1 before selecting an active model.
 
-## External training on Workers Free
+## Optional manual training in Bun
 
-The production API no longer starts TensorFlow Workflows. The training form calls `POST /api/training`, which dispatches a job to the external Bun service. The UI polls D1 for progress, model readiness and reports. The CLI remains available for manual training. TensorFlow fitting and Zod validation of full weights run in Bun. Wrangler reads the D1 snapshot and uploads validated model/report JSON directly, avoiding the Worker CPU budget. The script needs the same Cloudflare account access used for migrations; it works from a local machine or a service with Bun, Node and authenticated Wrangler.
+Production uses `POST /api/train` to start `env.TRAINING` directly. `TRAINING_SERVICE_URL` and `TRAINING_SERVICE_TOKEN` are not used by that flow. Worker CPU limits still apply. The following CLI is retained as an optional manual alternative. TensorFlow fitting and Zod validation of full weights run in Bun. Wrangler reads the D1 snapshot and uploads validated model/report JSON directly, avoiding the Worker CPU budget. The script needs the same Cloudflare account access used for migrations; it works from a local machine or a service with Bun, Node and authenticated Wrangler.
 
 From the repository root:
 
@@ -105,29 +105,11 @@ The root build installs `cloudflare/` dependencies, generates the Prisma D1 clie
 
 The old Node commands are explicit aliases: `bun run build:node`, `bun run dev:node` and `bun run deploy:node`. The `main` branch is not modified by this fix.
 
-## Hosted training service
-
-On the Bun server, install both packages and run:
-
-```bash
-bun install --frozen-lockfile
-bun install --cwd cloudflare --frozen-lockfile
-bun run training:serve
-```
-
-Configure `TRAINING_SERVICE_TOKEN` in the server's secret manager. Give the same secret to the Worker using `bunx wrangler secret put TRAINING_SERVICE_TOKEN` from `cloudflare/`; enter it through the interactive prompt, not source code or command arguments. The service also needs Wrangler authentication (`CLOUDFLARE_API_TOKEN` with D1 write access and `CLOUDFLARE_ACCOUNT_ID`, or an existing authenticated Wrangler profile). It defaults to port 3001 and listens on `0.0.0.0`; `PORT` and `TRAINING_HOST` can override these.
-
-Configure `TRAINING_SERVICE_URL` on the Worker with the HTTPS base URL of this service. It is kept as a Worker secret so deployments preserve it; use `bunx wrangler secret put TRAINING_SERVICE_URL` from `cloudflare/`. The service URL must reach the process running this repository's `training:serve`, not an unrelated Bun application.
-
-Protocol: authenticated `POST /training` with `{ "jobId": "UUID", "options": { "learningRate": 0.001, "epochs": 80, "compareLearningRates": false } }`; respond HTTP 202 with the same job ID immediately. `GET /health` returns HTTP 200. Training uses a subprocess, so the HTTP response does not wait for fitting. D1 creates/locks the job before dispatch; the trainer claims that ID once, writes progress/models/reports and activates the model atomically. Duplicate starts cannot fit the same job twice.
-
-Deletion immediately clears the UI history, selection and count. Pending history requests are aborted and cannot restore deleted rows; physical Vectorize deletion continues through the durable outbox after the API response.
-
 ## Authorizing training requests with Cloudflare Access
 
 Start training with `POST /api/train?learningRate=0.001&epochs=80&compareLearningRates=false`. `DELETE /api/train` clears training data. Both require an authenticated Cloudflare Access invocation. `GET /api/train` never starts a run. The previous POST/DELETE `/api/training` aliases require the same Access authorization.
 
-The Worker verifies the Access JWT using the team’s public signing keys, expected issuer/application audience, RS256 signature and expiration. It reads `Cf-Access-Jwt-Assertion` or the `CF_Authorization` cookie; it does not rely on `ctx.access`, which was absent for this deployment. Missing Access returns HTTP 403 before any job is created or deleted. Forged identity headers cannot create that context. The modal contains no access-key field and sends no shared secret; the browser uses its Access session. `TRAINING_ADMIN_TOKEN` is no longer used. `TRAINING_SERVICE_TOKEN` remains necessary for the Worker to authenticate to the hosted Bun service.
+The Worker verifies the Access JWT using the team’s public signing keys, expected issuer/application audience, RS256 signature and expiration. It reads `Cf-Access-Jwt-Assertion` or the `CF_Authorization` cookie; it does not rely on `ctx.access`, which was absent for this deployment. Missing Access returns HTTP 403 before any job is created or deleted. Forged identity headers cannot create that context. The modal contains no access-key field and sends no shared secret; the browser uses its Access session. `TRAINING_ADMIN_TOKEN` is no longer used. The production workflow uses its binding directly and does not call a hosted Bun service.
 
 In Zero Trust → Access → Applications, create a self-hosted application with both public hostnames/paths in the same application:
 

@@ -41,7 +41,9 @@
     submit.textContent = busy ? "Starting…" : "Start training";
   }
   function renderStatus(data) {
-    if (typeof data.executor != 'undefined') useTrainEndpoint = data.executor === "external";
+    if (typeof data.trainingEndpoint != 'undefined' || typeof data.executor != 'undefined') {
+      useTrainEndpoint = data.trainingEndpoint === "/api/train" || data.executor === "external";
+    }
     const training = data.training;
     const running = training.status === "running" || training.status === "clearing";
     if (heading) heading.textContent = training.status === "running" ? "Training in progress"

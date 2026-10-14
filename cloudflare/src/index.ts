@@ -91,7 +91,7 @@ export default {
         if (request.method === "GET") {
           const [model, training] = await Promise.all([activeModel(db), latestTraining(env)]);
           cleanupVectors(env, ctx);
-          return json(HTTP.ok, { training, executor: "external", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
+          return json(HTTP.ok, { training, executor: "workflow", trainingEndpoint: "/api/train", trainingAuthRequired: true, modelReady: model !== null, modelId: model?.modelId ?? null });
         }
         if (request.method === "POST") {
           await requireTrainingAuthorization(request, env);

@@ -45,33 +45,18 @@ async function createOperation(env: Env, status: string, message: string, option
     throw error;
   }
 }
-type ExternalTrainingEnv = Env & { TRAINING_SERVICE_URL?: string; TRAINING_SERVICE_TOKEN?: string };
-const SERVICE_START_TIMEOUT_MS = 10_000;
-export async function startTraining(env: ExternalTrainingEnv, input: unknown) {
+export async function startTraining(env: Env, input: unknown) {
   const options = trainingOptionsSchema.parse(input);
-  if (!env.TRAINING_SERVICE_URL || !env.TRAINING_SERVICE_TOKEN) {
-    throw new HttpError(503, "Configure the external training service URL and token before starting training.");
-  }
-  const endpoint = new URL("/training", env.TRAINING_SERVICE_URL);
-  if (endpoint.protocol !== "https:") throw new HttpError(503, "The training service must use an HTTPS URL.");
-  const job = await createOperation(env, "running", "Starting the external training service…", options, true);
+  const job = await createOperation(env, "running", "Preparing pair vectors…", options);
   try {
-    const response = await fetch(endpoint, {
-      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${env.TRAINING_SERVICE_TOKEN}` },
-      body: JSON.stringify({ jobId: job.id, options }), signal: AbortSignal.timeout(SERVICE_START_TIMEOUT_MS),
-    });
-    if (!response.ok) throw new HttpError(502, "The external training service could not accept this run.");
-    const acknowledgment = await response.json();
-    if (!acknowledgment || typeof acknowledgment !== "object" || !("jobId" in acknowledgment) || acknowledgment.jobId !== job.id) {
-      throw new HttpError(502, "The external training service returned an invalid job acknowledgment.");
-    }
+    // Use the existing binding directly; the application URL is not a Bun training service.
+    await env.TRAINING.create({ id: job.id, params: { jobId: job.id } });
     return trainingStatus(job);
-  } catch (error) {
+  } catch {
     await database(env).trainingJob.updateMany({ where: { id: job.id, status: "running" }, data: {
-      activeKey: null, status: "failed", finishedAt: new Date(), message: "Could not start the external training service.",
+      activeKey: null, status: "failed", finishedAt: new Date(), message: "Could not start the training workflow.",
     } });
-    if (error instanceof HttpError) throw error;
-    throw new HttpError(502, "Could not reach the external training service.");
+    throw new HttpError(502, "Could not start the training workflow.");
   }
 }
 export async function clearTrainingData(env: Env) {
