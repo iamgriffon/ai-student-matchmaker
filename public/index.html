@@ -6,6 +6,7 @@
     <title>Vestibulandos · Study partners</title>
     <link rel="stylesheet" href="/styles.css" />
     <script src="/i18n.js" defer></script>
+    <script src="/recommendationWorkerClient.js" defer></script>
     <script src="/app.js" defer></script>
     <script src="/outcomes.js" defer></script>
     <script src="/trainingControls.js" defer></script>
@@ -109,6 +110,7 @@
           <label>Learning rate<input id="training-learning-rate" name="learningRate" type="number" min="0" step="any" value="0.001" required /></label>
           <label>Iterations<input id="training-epochs" name="epochs" type="number" min="1" step="1" value="80" required /></label>
         </div>
+        <label>Batch size<input id="training-batch-size" name="batchSize" type="number" min="1" max="256" step="1" value="64" required /></label>
         <label class="checkbox"><input id="compare-learning-rates" name="compareLearningRates" type="checkbox" /> Also compare with learning rate 0.01</label>
         <p id="training-form-error" class="form-error" role="alert" hidden></p>
         <div class="form-actions"><button type="button" id="cancel-training" class="secondary">Cancel</button><button id="submit-training" type="submit" class="primary">Start training</button></div>

@@ -1,3 +1,0 @@
-[test]
-# Install the database mock before any test module imports application code.
-preload = ["./db/tests/fixtutes/db.fixtures.ts"]

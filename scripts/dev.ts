@@ -1,93 +1,35 @@
-import { watch, type FSWatcher } from "node:fs";
-import { extname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PROJECT_ROOT = fileURLToPath(new URL("../", import.meta.url));
-const WATCHED_DIRECTORIES = ["src", "db", "scripts", "public"];
-const WATCHED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".html", ".css", ".toml"]);
-const RESTART_DEBOUNCE_MS = 250;
-const SERVER_STOP_TIMEOUT_MS = 5000;
-const SERVER_ENTRYPOINT = "src/index.ts";
-const watchers: FSWatcher[] = [];
-let child: ReturnType<typeof Bun.spawn> | null = null;
-let restartTimer: ReturnType<typeof setTimeout> | null = null;
-let restarting = false;
-let restartPending = false;
-let stopping = false;
+const WRANGLER = fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url));
+const DEFAULT_PORT = "8787";
 
-function shouldWatch(filename: string) {
-  const segments = filename.split(/[\\/]/);
-  if (segments.some((segment) => ["node_modules", "tests", "dist", ".git"].includes(segment))) return false;
-  if (/\.(test|spec)\.[^.]+$/.test(filename)) return false;
-  const name = basename(filename);
-  return WATCHED_EXTENSIONS.has(extname(name)) || name === "bun.lock" || name === ".env" || name.startsWith(".env.");
-}
-
-function startServer() {
-  child = Bun.spawn([process.execPath, "run", SERVER_ENTRYPOINT], {
-    cwd: PROJECT_ROOT, env: process.env, stdin: "inherit", stdout: "inherit", stderr: "inherit",
+async function wrangler(args: string[]) {
+  const child = Bun.spawn(["node", WRANGLER, ...args], {
+    cwd: PROJECT_ROOT, stdin: "inherit", stdout: "inherit", stderr: "inherit",
   });
-  const current = child;
-  current.exited.then((code) => {
-    if (child !== current) return;
-    child = null;
-    if (!stopping && !restarting) console.log(`[dev] Servidor encerrado (${code}). Aguardando alterações…`);
-  });
+  const stop = () => child.kill("SIGTERM");
+  process.on("SIGINT", stop);
+  process.on("SIGTERM", stop);
+  try { return await child.exited; }
+  finally {
+    process.off("SIGINT", stop);
+    process.off("SIGTERM", stop);
+  }
 }
 
-async function stopServer() {
-  const current = child;
-  if (!current) return;
-  current.kill("SIGTERM");
-  const timeout = setTimeout(() => current.kill("SIGKILL"), SERVER_STOP_TIMEOUT_MS);
-  try { await current.exited; }
-  finally { clearTimeout(timeout); }
+const args = process.argv.slice(2);
+if (args.includes("--local")) {
+  for (const script of ["scripts/local/generate.ts", "scripts/local/migrate.ts"]) {
+    const child = Bun.spawn([process.execPath, script], { cwd: PROJECT_ROOT, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    const code = await child.exited;
+    if (code !== 0) process.exit(code);
+  }
+  const child = Bun.spawn([process.execPath, "--watch", "src/local/server.ts"], { cwd: PROJECT_ROOT, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+  process.on("SIGINT", () => child.kill("SIGTERM"));
+  process.on("SIGTERM", () => child.kill("SIGTERM"));
+  process.exit(await child.exited);
 }
-
-async function restartServer() {
-  if (stopping) return;
-  if (restarting) { restartPending = true; return; }
-  restarting = true;
-  try {
-    do {
-      restartPending = false;
-      await stopServer();
-      if (!stopping) startServer();
-    } while (restartPending && !stopping);
-  } finally { restarting = false; }
-}
-
-function scheduleRestart(filename: string) {
-  if (stopping || !shouldWatch(filename)) return;
-  // O --watch do próprio launcher já reinicia este arquivo.
-  if (filename === "scripts/dev.ts") return;
-  if (restartTimer) clearTimeout(restartTimer);
-  restartTimer = setTimeout(() => {
-    console.log(`[dev] ${filename} alterado. Reiniciando servidor…`);
-    void restartServer();
-  }, RESTART_DEBOUNCE_MS);
-}
-
-async function shutdown() {
-  if (stopping) return;
-  stopping = true;
-  if (restartTimer) clearTimeout(restartTimer);
-  for (const watcher of watchers) watcher.close();
-  await stopServer();
-  process.exit(0);
-}
-
-for (const directory of WATCHED_DIRECTORIES) {
-  watchers.push(watch(new URL(`../${directory}/`, import.meta.url), { recursive: true }, (_, filename) => {
-    if (filename !== null) scheduleRestart(`${directory}/${filename}`);
-  }));
-}
-// Configurações na raiz também contam; dependências e arquivos gerados fora dos módulos ficam de fora.
-watchers.push(watch(PROJECT_ROOT, (_, filename) => {
-  if (filename !== null) scheduleRestart(filename);
-}));
-process.once("SIGINT", shutdown);
-process.once("SIGTERM", shutdown);
-process.once("exit", () => child?.kill());
-console.log(`[dev] Observando ${WATCHED_DIRECTORIES.join(", ")} e configurações da raiz.`);
-startServer();
+const migrationExit = await wrangler(["d1", "migrations", "apply", "vestibulandos", "--local"]);
+if (migrationExit !== 0) process.exit(migrationExit);
+process.exit(await wrangler(["dev", "--ip", "127.0.0.1", "--var", "LOCAL_DEVELOPMENT:true", "--port", DEFAULT_PORT, ...args]));

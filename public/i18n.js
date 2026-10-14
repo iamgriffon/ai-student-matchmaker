@@ -89,7 +89,10 @@
   })).then((entries) => {
     catalogs = Object.fromEntries(entries);
     sourceAliases = catalogs.source;
-    templates = Object.keys(catalogs[DEFAULT_LOCALE]).filter((key) => key.includes("{")).map((key) => {
+    templates = Object.keys(catalogs[DEFAULT_LOCALE]).filter((key) => key.includes("{"))
+      // Match explicit suffixes before generic placeholders can swallow them.
+      .sort((a, b) => b.replace(/\{[^}]+\}/g, "").length - a.replace(/\{[^}]+\}/g, "").length)
+      .map((key) => {
       const names = [...key.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
       const parts = key.split(/\{[^}]+\}/g).map(escapePattern);
       return { key, names, pattern: new RegExp(`^${parts.join("(.+?)")}$`) };

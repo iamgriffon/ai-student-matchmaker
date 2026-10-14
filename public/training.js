@@ -1,4 +1,6 @@
 const trainingState = { iterations: [], selectedId: null, loading: false };
+let trainingLoadRevision = 0;
+let trainingLoadController = null;
 const trainingElements = Object.fromEntries(["training-list", "training-detail", "training-count", "training-notice", "reload-training"].map((id) => [id, document.getElementById(id)]));
 const METRIC_PRECISION = 6;
 const PLOT_WIDTH = 600;
@@ -35,7 +37,7 @@ function renderTraining() {
   const report = row.trainingReport;
   const facts = [
     ["Architecture", row.architecture.join(" → ")], ["Learning rate", metric(metadata.learningRate)],
-    ["Iterations", metadata.epochs], ["Training pairs", metadata.trainingCount], ["Validation pairs", metadata.validationCount],
+    ["Iterations", metadata.epochs], ["Batch size", report?.batchSize ?? "Not recorded"], ["Training pairs", metadata.trainingCount], ["Validation pairs", metadata.validationCount],
     ["Validation MAE", metric(metadata.validationMeanAbsoluteError)], ["Eligible-pair validation MAE", metric(metadata.eligibleValidationMeanAbsoluteError)],
     ["Validation strategy", strategyName(metadata.validationStrategy)], ["Training students", report?.trainingStudents ?? "Not recorded"],
     ["Validation students", report?.validationStudents ?? "Not recorded"], ["Excluded cross-group pairs", report?.excludedCrossGroupPairs ?? "Not recorded"],
@@ -46,20 +48,23 @@ function renderTraining() {
   trainingElements["training-detail"].innerHTML = `<div class="section-heading"><h2 id="training-detail-heading">${trainingEscape(row.modelId)}</h2>${row.active ? '<span class="active-badge">Active model</span>' : ""}</div><dl class="training-facts">${facts.map(([label, value]) => `<div><dt>${trainingEscape(label)}</dt><dd>${trainingEscape(value)}</dd></div>`).join("")}</dl><h3>Training error per iteration</h3>${lossChart(report?.lossHistory)}${comparison}<details class="training-json"><summary>View metadata and JSON report</summary><pre>${trainingEscape(JSON.stringify({ metadata, trainingReport: report }, null, 2))}</pre></details>`;
 }
 async function loadTraining() {
-  if (trainingState.loading) return;
+  const revision = ++trainingLoadRevision;
+  trainingLoadController?.abort();
+  trainingLoadController = new AbortController();
   trainingState.loading = true;
   trainingElements["training-notice"].textContent = "Loading training runs…";
   renderTraining();
   try {
-    const response = await fetch("/api/trained-models");
+    const response = await fetch("/api/trained-models", { signal: trainingLoadController.signal, cache: "no-store" });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Could not load training runs.");
     if (!Array.isArray(data.iterations)) throw new Error("Invalid training history.");
+    if (revision !== trainingLoadRevision) return;
     trainingState.iterations = data.iterations;
     if (!data.iterations.some((row) => row.id === trainingState.selectedId)) trainingState.selectedId = data.iterations.find((row) => row.active)?.id ?? data.iterations[0]?.id ?? null;
     trainingElements["training-notice"].textContent = data.iterations.length ? "Training history loaded. Refresh after a new training run." : "Train a model to create the first training run.";
-  } catch (error) { trainingElements["training-notice"].textContent = error.message; }
-  finally { trainingState.loading = false; renderTraining(); }
+  } catch (error) { if (revision === trainingLoadRevision && error.name !== "AbortError") trainingElements["training-notice"].textContent = error.message; }
+  finally { if (revision === trainingLoadRevision) { trainingState.loading = false; renderTraining(); } }
 }
 trainingElements["training-list"].addEventListener("click", (event) => {
   const button = event.target.closest("[data-iteration-id]");
@@ -68,6 +73,15 @@ trainingElements["training-list"].addEventListener("click", (event) => {
   renderTraining();
 });
 trainingElements["reload-training"].addEventListener("click", loadTraining);
+document.addEventListener("training-data-cleared", () => {
+  ++trainingLoadRevision;
+  trainingLoadController?.abort();
+  trainingState.iterations = [];
+  trainingState.selectedId = null;
+  trainingState.loading = false;
+  trainingElements["training-notice"].textContent = "Train a model to create the first training run.";
+  renderTraining();
+});
 document.addEventListener("training-data-changed", loadTraining);
 document.addEventListener("locale-changed", renderTraining);
 loadTraining();

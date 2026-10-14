@@ -181,5 +181,15 @@
   "Modelo incompatível com o encoder ou a política atual": "The model is incompatible with the current encoder or policy",
   "O modelo não atingiu o limite de erro de validação": "The model did not meet the validation error threshold",
   "Modelo não encontrado": "Model not found",
-  "Modelo não encontrado.": "Model not found."
+  "Modelo não encontrado.": "Model not found.",
+  "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.": "The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.",
+  "Could not load model status": "Could not load model status",
+  "Show local command": "Show local command",
+  "Run this command in your local project:": "Run this command in your local project:",
+  "Training access key": "Training access key",
+  "Invalid training access key.": "Invalid training access key.",
+  "Batch size": "Batch size",
+  "Tensor memory: {memory} MiB": "Tensor memory: {memory} MiB",
+  "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}": "Training {iteration}/{iterationCount} · iteration {epoch}/{totalEpochs} · batch {batch}/{totalBatches}",
+  "Training exceeded the Worker CPU limit.": "Training exceeded the Worker CPU limit."
 }

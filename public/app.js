@@ -7,6 +7,7 @@ const state = {
 const PAIR_MEMBER_COUNT = 2;
 const SCORE_FRACTION_DIGITS = 1;
 const RECOMMENDATION_SKELETON_COUNT = 5;
+const DIVERSITY_SCALE = 100;
 let recommendationRevision = 0;
 let recommendationController = null;
 const recommendationCache = new Map();
@@ -75,7 +76,7 @@ function renderList() {
   }
   elements["student-list"].innerHTML = filtered.length ? filtered.map((user) => `
     <button class="student-row ${state.selectedId === user.id ? "selected" : ""}" data-user-id="${escapeHtml(user.id)}" aria-pressed="${state.selectedId === user.id}">
-      ${avatar(user)}<span class="student-copy"><span class="student-name" data-i18n-skip>${escapeHtml(nameOf(user))}</span><span class="student-summary">Score ${escapeHtml(user.score)} · ${escapeHtml(user.age)} years${user.disability ? " · Disabled" : ""}</span></span>
+      ${avatar(user)}<span class="student-copy"><span class="student-name" data-i18n-skip>${escapeHtml(nameOf(user))}</span><span class="student-summary">Score ${escapeHtml(user.score)} · ${escapeHtml(user.age)} years${user.disability ? " · Has disability" : ""}</span></span>
     </button>`).join("") : `<p class="empty">${query ? "No students match this search." : "No students yet. Add a student to get started."}</p>`;
 }
 
@@ -139,7 +140,7 @@ function renderSelection() {
   }
   elements["selected-student"].innerHTML = `
     <div class="selected-header">${avatar(selected)}<div class="selected-copy"><h2 data-i18n-skip>${escapeHtml(nameOf(selected))}</h2><p class="email">${escapeHtml(selected.email)}</p></div><button class="delete-button" id="delete-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Delete student</button></div>
-    <div class="metrics"><div><span class="metric-label">Exam score</span><span class="metric-value">${escapeHtml(selected.score)} <small>/ 100</small></span></div><div><span class="metric-label">Monthly income</span><span class="metric-value">${escapeHtml(incomeOf(selected))}</span></div><div><span class="metric-label">Profile</span><span class="metric-value">${selected.disability ? "Disabled" : "No disability"}</span></div></div>
+    <div class="metrics"><div><span class="metric-label">Exam score</span><span class="metric-value">${escapeHtml(selected.score)} <small>/ 100</small></span></div><div><span class="metric-label">Monthly income</span><span class="metric-value">${escapeHtml(incomeOf(selected))}</span></div><div><span class="metric-label">Profile</span><span class="metric-value">${selected.disability ? "Has disability" : "No disability"}</span></div></div>
     <div class="generate-actions"><button class="secondary" id="edit-student" ${state.busy || state.loading || state.recommendationLoading ? "disabled" : ""}>Edit student</button><button class="primary" id="generate-recommendations" ${state.busy || state.loading || state.recommendationLoading || state.modelReady !== true || state.trainingBusy ? "disabled" : ""}>${state.recommendationLoading ? "Loading recommendations…" : recommendationCache.has(selected.id) ? "Refresh recommendations" : "Generate recommendations"}</button></div>`;
   if (state.recommendationLoading) {
     elements["recommendation-summary"].textContent = "Loading recommendations…";
@@ -162,8 +163,16 @@ function renderSelection() {
     const user = pair.partner;
     const mean = (result.selectedScore + scoreOf(user)) / PAIR_MEMBER_COUNT;
     const canStart = result.canStartPairs && result.model && !pair.outcomeId && !hasStartedPair(result.userId, user.id);
-    return `<article class="recommendation"><span class="rank">${index + 1}</span>${avatar(user)}<div class="recommendation-info"><h3 data-i18n-skip>${escapeHtml(nameOf(user))}</h3><p>Score ${escapeHtml(user.score)} · ${escapeHtml(incomeOf(user))}${user.disability ? " · Disabled" : ""}</p></div><div class="pair-mean"><span>Average score</span>${mean.toLocaleString(window.i18n.locale, { maximumFractionDigits: SCORE_FRACTION_DIGITS })}</div>${canStart ? `<button class="secondary start-pair" data-partner-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>Start study pair</button>` : ""}</article>`;
+    return `<article class="recommendation"><span class="rank">${index + 1}</span>${avatar(user)}<div class="recommendation-info"><h3 data-i18n-skip>${escapeHtml(nameOf(user))}</h3><p>Score ${escapeHtml(user.score)} · ${escapeHtml(incomeOf(user))}${user.disability ? " · Has disability" : ""}</p></div><div class="pair-mean"><span>Average score</span>${mean.toLocaleString(window.i18n.locale, { maximumFractionDigits: SCORE_FRACTION_DIGITS })}</div>${sociodiversityIndex(pair)}${canStart ? `<button class="secondary start-pair" data-partner-id="${escapeHtml(user.id)}" ${state.busy ? "disabled" : ""}>Start study pair</button>` : ""}</article>`;
   }).join("") : `<p class="empty">${result.evaluatedCount ? "No study pairs meet the criteria." : "Add another student."}</p>`;
+}
+
+function sociodiversityIndex(pair) {
+  const distance = pair.metrics?.incomeDistance;
+  if (!Number.isFinite(distance) || distance < 0 || distance > 1) return "";
+  const diversity = distance * DIVERSITY_SCALE;
+  const displayed = diversity.toLocaleString(window.i18n.locale, { maximumFractionDigits: SCORE_FRACTION_DIGITS });
+  return `<div class="sociodiversity-index"><span>Sociodiversity index</span><strong data-i18n-skip>${displayed}</strong></div>`;
 }
 
 function render() {
@@ -179,7 +188,9 @@ function render() {
 
 async function requestUsers(path, options) {
   const response = await fetch(path, options);
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => {
+    throw new Error(window.i18n.t("The API returned an empty or invalid response (HTTP {status}). Check the Worker deployment.", { status: response.status }));
+  });
   if (!response.ok) throw new Error(data.error || data.message || "Could not complete the operation. Please try again.");
   if (!Array.isArray(data.users)) throw new Error("The server returned an invalid student list.");
   return data.users;
@@ -325,8 +336,9 @@ async function generateRecommendations() {
     const response = await fetch(`/api/users/${encodeURIComponent(userId)}/recommendations`, {
       method: "POST", signal: recommendationController.signal,
     });
-    const data = await response.json().catch(() => ({}));
+    let data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Could not generate recommendations.");
+    if (data.inference) data = await window.rankRecommendations(data, recommendationController.signal);
     if (data.userId !== userId || !Array.isArray(data.recommendations) || !Number.isFinite(data.selectedScore) || !Number.isFinite(data.cohortMeanScore)) {
       throw new Error("The server returned invalid recommendations.");
     }

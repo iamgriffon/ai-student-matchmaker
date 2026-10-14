@@ -1,199 +1,81 @@
-import * as tf from "@tensorflow/tfjs";
-import { listUsers, type StarterUser } from "../db/users";
-import { parseIncome } from "./utils/incomeParser";
-import { createContextVersion } from "./utils/contextVersion.ts";
+import type { RuntimeEnv as Env } from "./runtimeEnv.ts";
+import { z } from "zod";
+import { database, HttpError, APP_STATE_ID, VECTOR_BATCH_SIZE, type Database } from "./database.ts";
+import { encodeVectorizeValues } from "./vectorizeEncoding.ts";
+import { contextFromUsers, type Cohort } from "./cohortEncoding.ts";
+export { contextFromUsers, pairFeatures, type Cohort } from "./cohortEncoding.ts";
 
-// Incremente esta versão se mudar as escalas, a ordem ou o significado
-// das características dos encoders individual e de dupla.
-import { PAIR_ENCODER_VERSION } from "./vectorSchema.ts";
-export { PAIR_ENCODER_VERSION } from "./vectorSchema.ts";
-
-// Os encoders esperam nota e renda já transformadas para escalas comparáveis,
-// e PCD representado por 0 ou 1. O tipo number não garante a escala nem valida os dados.
-// Apesar do nome, nota e renda são características numéricas, não categorias one-hot.
-type StudentCategoricalFeatures = {
-  score: number;
-  income: number;
-  disability: number;
-};
-
-// Cada aluno vira um tensor [3], com ordem fixa: [nota, renda, PCD].
-// A mesma ordem deve ser usada no treinamento e na recomendação.
-// Preservamos as características; os pesos entrarão na avaliação dos critérios.
-// Quem chamar o encoder deve liberar o tensor com dispose() ou usar tf.tidy().
-const encodeStudent = (student: StudentCategoricalFeatures): tf.Tensor1D =>
-  tf.tensor1d([
-    student.score,
-    student.income,
-    student.disability,
-  ]);
-
-// Descreve a relação entre dois alunos em um tensor [4]. A+B e B+A geram o mesmo
-// vetor, pois médias e diferenças absolutas não dependem da ordem dos integrantes.
-// cohortMeanScore precisa estar na mesma escala das notas dos dois alunos.
-// O vetor ainda não é uma previsão de sucesso. O chamador deve liberar esse tensor.
-export const encodePair = (
-  a: StudentCategoricalFeatures,
-  b: StudentCategoricalFeatures,
-  cohortMeanScore: number,
-): tf.Tensor1D => {
-  const pairMeanScore = (a.score + b.score) / 2;
-
-  return tf.tensor1d([
-    // Menor = média da dupla mais próxima da turma; aproximação de equilíbrio acadêmico.
-    Math.abs(pairMeanScore - cohortMeanScore),
-    // Expõe diferenças acadêmicas grandes mesmo quando a média da dupla está equilibrada.
-    Math.abs(a.score - b.score),
-    // Maior = maior distância na renda transformada; um critério de diversidade social.
-    Math.abs(a.income - b.income),
-    // 1 se os indicadores diferem, 0 se são iguais; apenas uma dimensão de diversidade.
-    Math.abs(a.disability - b.disability),
-  ]);
-};
-
-// Reúne os dados e referências para preparar as características.
-export const createContext = async () => createContextFromUsers(await listUsers());
-
-// A versão síncrona também aceita o snapshot lido dentro de uma transação.
-// Assim o cadastro e os vetores usam exatamente a mesma turma.
-export const createContextFromUsers = (users: StarterUser[]) => {
-
-  if (!users?.length) {
-    throw new Error("Nenhum aluno disponível");
+const CONTEXT_ATTEMPTS = 3;
+export function parseUserId(value: string) { return z.uuid().parse(value.trim()).toLowerCase(); }
+export function orderedMembers(a: string, b: string) {
+  const first = parseUserId(a), second = parseUserId(b);
+  if (first === second) throw new HttpError(400, "A study pair needs two different students.");
+  return first < second ? { userAId: first, userBId: second } : { userAId: second, userBId: first };
+}
+export async function cohort(db: Database) {
+  for (let attempt = 0; attempt < CONTEXT_ATTEMPTS; attempt++) {
+    const before = await db.appState.findUniqueOrThrow({ where: { id: APP_STATE_ID } });
+    const users = await db.user.findMany({ orderBy: { id: "asc" } });
+    const after = await db.appState.findUniqueOrThrow({ where: { id: APP_STATE_ID } });
+    if (before.revision !== after.revision || before.vectorGeneration !== after.vectorGeneration) continue;
+    return contextFromUsers(users, after.revision, after.vectorGeneration);
   }
+  throw new HttpError(409, "The cohort changed. Please try again.");
+}
+export function pairNamespace(context: Cohort) { return `p-${context.generation}-${context.contextVersion.slice(0, 48)}`; }
 
-  const preparedUsers = users.map((user) => {
-    // Evita produzir tensores com NaN ou notas fora da escala do exame.
-    if (
-      !Number.isFinite(user.score) ||
-      user.score < 0 ||
-      user.score > 100
-    ) {
-      throw new Error(`Nota inválida para o aluno ${user.id}`);
-    }
+async function vectorId(key: string) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
-    // Informação ausente não deve virar automaticamente "não PCD".
-    if (typeof user.disability !== "boolean") {
-      throw new Error(`Indicador PCD ausente para o aluno ${user.id}`);
-    }
-
-    if (typeof user.income !== "string" || !user.income.trim()) {
-      throw new Error(`Renda ausente para o aluno ${user.id}`);
-    }
-
-    // Atenção: o parser atual transforma strings inválidas em zero.
-    // Este trecho pressupõe que o formato da renda foi validado no cadastro.
-    const income = parseIncome(user.income);
-
-    if (!Number.isFinite(income) || income < 0) {
-      throw new Error(`Renda inválida para o aluno ${user.id}`);
-    }
-
-    return {
-      id: user.id,
-      score: user.score,
-      income,
-      disability: user.disability,
-    };
-  }).sort((a, b) => a.id.localeCompare(b.id));
-
-  // log(1 + renda) aceita renda zero e comprime diferenças grandes.
-  // Usamos a mesma transformação e os mesmos limites para todos os alunos.
-  const logIncomes = preparedUsers.map((user) => Math.log1p(user.income));
-  const minLogIncome = Math.min(...logIncomes);
-  const maxLogIncome = Math.max(...logIncomes);
-
-  const normalizeIncome = (income: number): number => {
-    if (maxLogIncome === minLogIncome) return 0;
-
-    return (
-      (Math.log1p(income) - minLogIncome) /
-      (maxLogIncome - minLogIncome)
-    );
-  };
-
-  // Mantemos as características junto do ID.
-  // Assim não dependemos de vários arrays paralelos para identificar um aluno.
-  const students = preparedUsers.map((user) => ({
-    userId: user.id,
-    features: {
-      score: user.score / 100,
-      income: normalizeIncome(user.income),
-      disability: user.disability ? 1 : 0,
-    } satisfies StudentCategoricalFeatures,
-  }));
-
-  // Calculamos a média usando as notas já normalizadas.
-  // Isso evita comparar uma média como 60 com um vetor cuja nota é 0,8.
-  const cohortMeanScore =
-    students.reduce((sum, student) => sum + student.features.score, 0) /
-    students.length;
-
-  // A ordenação por ID antes da redução também evita variações da média
-  // causadas pela ordem de soma de números de ponto flutuante.
-  const incomeScale = { minLogIncome, maxLogIncome };
-  const contextVersion = createContextVersion({
-    encoderVersion: PAIR_ENCODER_VERSION,
-    students,
-    cohortMeanScore,
-    incomeScale,
-  });
-
-  const studentVectors = tf.tidy(() => {
-    // Cada encoder produz [3].
-    const individualVectors = students.map((student) =>
-      encodeStudent(student.features),
-    );
-
-    // stack adiciona a dimensão dos alunos: [N, 3].
-    // tidy libera os vetores individuais e preserva a matriz retornada.
-    return tf.stack(individualVectors);
-  });
-
-  return {
-    users,
-    students,
-    cohortMeanScore,
-    contextVersion,
-    studentVectors,
-
-    // userIds[i] identifica a linha i da matriz.
-    userIds: students.map((student) => student.userId),
-
-    // Guardamos as referências para reproduzir a transformação de renda.
-    incomeScale,
-  };
-};
-
-if (import.meta.main) {
-  const context = await createContext();
-  let pairVector: tf.Tensor1D | undefined;
-
-  try {
-    // Uma linha por aluno; três colunas por linha.
-    context.studentVectors.print();
-
-    const a = context.students[0];
-    const b = context.students[1];
-
-    if (a && b) {
-      // Os primeiros dois alunos são apenas um exemplo de codificação.
-      // Ainda não estamos escolhendo a melhor dupla.
-      pairVector = encodePair(
-        a.features,
-        b.features,
-        context.cohortMeanScore,
-      );
-
-      console.log("Alunos da dupla:", a.userId, b.userId);
-
-      // [desequilíbrio, diferença acadêmica, diferença de renda, diferença PCD]
-      pairVector.print();
-    }
-  } finally {
-    // Os tensores retornados continuam alocados até serem liberados.
-    // finally executa a limpeza mesmo se ocorrer um erro durante o uso.
-    pairVector?.dispose();
-    context.studentVectors.dispose();
+export async function synchronizeStudentVectors(env: Env, context: Cohort) {
+  for (let offset = 0; offset < context.students.length; offset += VECTOR_BATCH_SIZE) {
+    const students = await Promise.all(context.students.slice(offset, offset + VECTOR_BATCH_SIZE).map(async (student) => ({ ...student, vectorId: await vectorId(`${context.revision}:${context.contextVersion}:${student.userId}`) })));
+    await env.STUDENT_INDEX.upsert(students.map((student) => ({
+      id: student.vectorId, metadata: { userId: student.userId }, namespace: context.contextVersion,
+      values: encodeVectorizeValues([student.features.score, student.features.income, student.features.disability]),
+    })));
+    await env.DB.batch(students.map((student) => env.DB.prepare(`
+      INSERT INTO StudentVectors (id, userId, contextVersion) SELECT ?, ?, ? FROM AppState WHERE id = ? AND revision = ?
+      ON CONFLICT(userId) DO UPDATE SET id = excluded.id, contextVersion = excluded.contextVersion
+    `).bind(student.vectorId, student.userId, context.contextVersion, APP_STATE_ID, context.revision)));
+  }
+}
+export async function savePairFeatures(env: Env, context: Cohort, pairs: readonly { userAId: string; userBId: string; features: readonly number[] }[]) {
+  const db = database(env);
+  for (let offset = 0; offset < pairs.length; offset += VECTOR_BATCH_SIZE) {
+    const prepared = await Promise.all(pairs.slice(offset, offset + VECTOR_BATCH_SIZE).map(async (pair) => ({ ...pair, vectorId: await vectorId(`${context.generation}:${context.revision}:${context.contextVersion}:${Object.values(orderedMembers(pair.userAId, pair.userBId)).join(":")}`) })));
+    const existing = await db.pairVector.findMany({ where: {
+      contextVersion: context.contextVersion, generation: context.generation,
+      OR: prepared.map((pair) => orderedMembers(pair.userAId, pair.userBId)),
+    } });
+    const existingByMembers = new Map(existing.map((row) => [`${row.userAId}:${row.userBId}`, row]));
+    const batch = prepared.filter((pair) => {
+      const members = orderedMembers(pair.userAId, pair.userBId);
+      const stored = existingByMembers.get(`${members.userAId}:${members.userBId}`);
+      return !stored?.uploaded || stored.vectorId !== pair.vectorId;
+    });
+    if (!batch.length) continue;
+    await env.DB.batch(batch.map((pair) => {
+      const members = orderedMembers(pair.userAId, pair.userBId);
+      return env.DB.prepare(`INSERT INTO PairVectors (id, vectorId, userAId, userBId, contextVersion, generation)
+        SELECT ?, ?, ?, ?, ?, ? FROM AppState WHERE id = ? AND revision = ? AND vectorGeneration = ?
+        ON CONFLICT(userAId, userBId) DO UPDATE SET uploaded = CASE WHEN PairVectors.vectorId = excluded.vectorId THEN PairVectors.uploaded ELSE 0 END, vectorId = excluded.vectorId, contextVersion = excluded.contextVersion, generation = excluded.generation
+      `).bind(crypto.randomUUID(), pair.vectorId, members.userAId, members.userBId, context.contextVersion, context.generation, APP_STATE_ID, context.revision, context.generation);
+    }));
+    const stored = await db.pairVector.findMany({ where: {
+      contextVersion: context.contextVersion, generation: context.generation,
+      OR: batch.map((pair) => orderedMembers(pair.userAId, pair.userBId)),
+    } });
+    const byMembers = new Map(batch.map((pair) => {
+      const members = orderedMembers(pair.userAId, pair.userBId);
+      return [`${members.userAId}:${members.userBId}`, pair.features];
+    }));
+    await env.PAIR_INDEX.upsert(stored.map((row) => {
+      const values = byMembers.get(`${row.userAId}:${row.userBId}`);
+      if (typeof values == 'undefined') throw new Error("Pair features missing.");
+      return { id: row.vectorId, values: encodeVectorizeValues(values), namespace: pairNamespace(context) };
+    }));
   }
 }

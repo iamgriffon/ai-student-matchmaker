@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
-import { trainedArtifactFixture, trainedModelFixture, trainingReportFixture } from "../../db/tests/fixtutes/trainedModels.fixtures.ts";
+import { trainedArtifactFixture, trainedModelFixture, trainingReportFixture } from "./fixtures/trainedModels.ts";
 import { parseId } from "../../src/utils/idParser.ts";
 
 const FIRST_ID = trainedModelFixture.id;
@@ -26,7 +26,8 @@ let app: TrainingApp;
 beforeEach(async () => {
   elements = new Map();
   fetchMock = mock<typeof fetch>(async () => Response.json({ iterations: [ITERATION] }));
-  const sandbox: { window: { i18n: { locale: string } }; document: { getElementById: (id: string) => Element; addEventListener: () => void }; fetch: typeof fetchMock; initialLoad: Promise<void>; testApi?: TrainingApp } = {
+  const sandbox: { AbortController: typeof AbortController; window: { i18n: { locale: string } }; document: { getElementById: (id: string) => Element; addEventListener: () => void }; fetch: typeof fetchMock; initialLoad: Promise<void>; testApi?: TrainingApp } = {
+    AbortController,
     document: { getElementById(id) { let element = elements.get(id); if (typeof element == 'undefined') { element = new Element(); elements.set(id, element); } return element; }, addEventListener: () => undefined },
     window: { i18n: { locale: "en-US" } }, fetch: fetchMock, initialLoad: Promise.resolve(),
   };
@@ -49,9 +50,9 @@ describe("training history frontend", () => {
   test("shows architecture, validation, report comparisons and the epoch chart", () => {
     const detail = elements.get("training-detail")?.innerHTML;
     expect(detail).toContain("4 → 1");
-    expect(detail).toContain("Students separados");
+    expect(detail).toContain("Different students in training and validation");
     expect(detail).toContain("Training pairs");
-    expect(detail).toContain("Comparação da mesma rodada");
+    expect(detail).toContain("No comparison report.");
     expect(detail).toContain("Training MSE per iteration");
     expect(detail).toContain("View metadata and JSON report");
     expect(detail).not.toContain("weightData");
@@ -74,13 +75,13 @@ describe("training history frontend", () => {
     fetchMock.mockResolvedValueOnce(Response.json({ iterations: [] }));
     await app.loadTraining();
     expect(app.state.selectedId).toBeNull();
-    expect(elements.get("training-list")?.innerHTML).toContain("Nenhum treinamento salvo");
+    expect(elements.get("training-list")?.innerHTML).toContain("No saved training runs.");
   });
   test("handles imported executions without epoch histories", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ iterations: [{ ...ITERATION, trainingReport: null }] }));
     await app.loadTraining();
-    expect(elements.get("training-detail")?.innerHTML).toContain("Sem histórico de perda por iteração");
-    expect(elements.get("training-detail")?.innerHTML).toContain("Sem relatório comparativo");
+    expect(elements.get("training-detail")?.innerHTML).toContain("No loss history for this training run.");
+    expect(elements.get("training-detail")?.innerHTML).toContain("No comparison report.");
   });
   test("displays request errors and allows retrying", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ error: "History unavailable" }, { status: 500 }));
@@ -95,12 +96,19 @@ describe("training history frontend", () => {
     await app.loadTraining();
     expect(elements.get("training-notice")?.textContent).toBe("Invalid training history.");
   });
-  test("blocks duplicate refresh requests while loading", async () => {
-    const pending = Promise.withResolvers<Response>(); fetchMock.mockReturnValueOnce(pending.promise);
+  test("cancels an older refresh and ignores its stale response", async () => {
+    const pending = Promise.withResolvers<Response>();
+    fetchMock.mockReturnValueOnce(pending.promise);
     const loading = app.loadTraining();
+    const signal = fetchMock.mock.calls[0]?.[1]?.signal;
     expect(elements.get("reload-training")?.disabled).toBe(true);
-    await app.loadTraining(); expect(fetchMock).toHaveBeenCalledTimes(1);
-    pending.resolve(Response.json({ iterations: [ITERATION] })); await loading;
+    fetchMock.mockResolvedValueOnce(Response.json({ iterations: [] }));
+    await app.loadTraining();
+    expect(signal?.aborted).toBe(true);
+    pending.resolve(Response.json({ iterations: [ITERATION] }));
+    await loading;
+    expect(app.state.iterations).toEqual([]);
+    expect(app.state.selectedId).toBeNull();
     expect(elements.get("reload-training")?.disabled).toBe(false);
   });
   test("escapes JSON and rendered content", async () => {
