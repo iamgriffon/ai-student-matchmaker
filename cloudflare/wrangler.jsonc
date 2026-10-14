@@ -11,6 +11,5 @@
     { "binding": "PAIR_INDEX", "index_name": "vestibulandos-pairs", "remote": true }
   ],
   "workflows": [{ "binding": "TRAINING", "name": "vestibulandos-training", "class_name": "TrainingWorkflow" }],
-  "limits": { "cpu_ms": 300000, "subrequests": 10000 },
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }

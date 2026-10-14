@@ -33,7 +33,7 @@ bunx wrangler vectorize create vestibulandos-students --dimensions=32 --metric=e
 bunx wrangler vectorize create vestibulandos-pairs --dimensions=32 --metric=euclidean
 ```
 
-The D1 binding in `wrangler.jsonc` already contains the supplied `vestibulandos` database ID. Keep its binding name `DB`, which the Worker expects. The Vectorize indexes must exist with the exact configured names and dimensions. Workflows are bound through the same config. This target requests a five-minute CPU budget for training and requires an appropriate Workers paid plan.
+The D1 binding in `wrangler.jsonc` already contains the supplied `vestibulandos` database ID. Keep its binding name `DB`, which the Worker expects. The Vectorize indexes must exist with the exact configured names and dimensions. Workflows are bound through the same config. Custom CPU and subrequest limits are omitted so deployment is accepted on Workers Free. This does not make TensorFlow training suitable for Free: its 10 ms CPU budget per invocation is insufficient for this workload. Inference and cohort processing may also exceed that budget. For in-Worker training, use Workers Paid and add `"limits": { "cpu_ms": 300000, "subrequests": 10000 }` to this config; otherwise training must run outside the Worker.
 
 ```bash
 bun run db:migrate:local
